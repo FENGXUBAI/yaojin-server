@@ -1,0 +1,15 @@
+{
+  "name": "yaojin-server",
+  "version": "1.0.0",
+  "description": "Simple game server for Yaojin",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
