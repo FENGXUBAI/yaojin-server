@@ -2,6 +2,7 @@ import { Card, Suit, createDeck, formatCard, makeCard, normalRanks, shuffle, sui
 import { Pattern, detectPattern, canBeat } from './patterns';
 
 export interface GameState {
+  gameId: string; // unique per round, used for client cache/reset and event scoping
   playerCount: number; // 3 or 4
   hands: Card[][];
   currentPlayer: number; // index
@@ -9,8 +10,12 @@ export interface GameState {
   passesInRow: number;
   lastPlayOwner: number | null;
   tablePlays: TablePlay[];
+  currentTrickPlays: TablePlay[];
   finishedOrder: number[]; // players who have "跑了"
   revolution: boolean; // 是否革命（用于下一局先手与进贡）
+  status: 'playing' | 'tribute_return';
+  pendingReturns: { actionBy: number; returnTo: number; count: number }[];
+  multiplier: number;
 }
 export interface TablePlay {
   by: number;
@@ -19,7 +24,8 @@ export interface TablePlay {
 
 export type PlayAction = { type: 'play'; cards: Card[] };
 export type PassAction = { type: 'pass' };
-export type Action = PlayAction | PassAction;
+export type ReturnTributeAction = { type: 'returnTribute'; cards: Card[] };
+export type Action = PlayAction | PassAction | ReturnTributeAction;
 
 export function dealHands(deck: Card[], playerCount: number): Card[][] {
   const shuffled = shuffle(deck);
@@ -44,6 +50,7 @@ export function findSpade4Owner(hands: Card[][]): number {
 export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundResult?: { finishedOrder: number[]; revolution: boolean } }): GameState {
   const deck = opts.deck ?? createDeck();
   const hands = dealHands(deck, opts.playerCount);
+  const gameId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   
   let firstPlayer = 0;
   if (!opts.lastRoundResult) {
@@ -68,6 +75,7 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
   }
 
   return {
+    gameId,
     playerCount: opts.playerCount,
     hands,
     currentPlayer: firstPlayer,
@@ -75,9 +83,84 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
     passesInRow: 0,
     lastPlayOwner: null,
     tablePlays: [],
+    currentTrickPlays: [],
     finishedOrder: [],
     revolution: false,
+    status: 'playing',
+    pendingReturns: [],
+    multiplier: 1,
   };
+}
+
+export function getHint(hand: Card[], lastPlay: Pattern | null): Card[] | null {
+  // 1. If no last play (free turn), suggest smallest single
+  if (!lastPlay) {
+    if (hand.length === 0) return null;
+    // Hand is sorted descending, so last card is smallest
+    return [hand[hand.length - 1]];
+  }
+
+  // 2. Try to find same type that beats lastPlay
+  // Group hand by rank
+  const counts = new Map<string, Card[]>();
+  for (const c of hand) {
+    const k = c.rank;
+    const arr = counts.get(k) || [];
+    arr.push(c);
+    counts.set(k, arr);
+  }
+
+  // Helper to find N cards of same rank > strength
+  const findTuple = (n: number, minStrength: number): Card[] | null => {
+    // Iterate ranks from smallest to largest (reverse of hand sort order)
+    // Hand is sorted descending. We can iterate from end to start.
+    // But grouping destroyed order. Let's iterate known ranks order.
+    // Actually, we can just iterate the map entries and sort by strength.
+    const candidates = Array.from(counts.entries())
+        .map(([_, cards]) => cards)
+        .filter(cards => cards.length >= n)
+        .sort((a, b) => a[0].sortValue - b[0].sortValue); // Ascending strength
+
+    for (const cards of candidates) {
+        if (cards[0].sortValue > minStrength) {
+            return cards.slice(0, n);
+        }
+    }
+    return null;
+  };
+
+  if (lastPlay.type === 'SINGLE') {
+      const res = findTuple(1, lastPlay.strength);
+      if (res) return res;
+  } else if (lastPlay.type === 'PAIR') {
+      if (!lastPlay.extra?.isKingBomb) {
+          const res = findTuple(2, lastPlay.strength);
+          if (res) return res;
+      }
+  } else if (lastPlay.type === 'TRIPLE') {
+      const res = findTuple(3, lastPlay.strength);
+      if (res) return res;
+  } else if (lastPlay.type === 'FOUR') {
+      const res = findTuple(4, lastPlay.strength);
+      if (res) return res;
+  }
+
+  // 3. Try Bombs (if lastPlay is not King Bomb)
+  const isKingBomb = lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb;
+  if (!isKingBomb) {
+      // Find smallest bomb
+      const bomb = findTuple(4, -1); // Any bomb
+      // If lastPlay was bomb, we already checked bigger bomb above.
+      // If lastPlay was NOT bomb, any bomb works.
+      if (lastPlay.type !== 'FOUR' && bomb) return bomb;
+  }
+
+  // 4. Try King Bomb
+  const big = hand.find(c => c.rank === 'JOKER_BIG');
+  const small = hand.find(c => c.rank === 'JOKER_SMALL');
+  if (big && small) return [big, small];
+
+  return null;
 }
 
 function removeCardsFromHand(hand: Card[], toRemove: Card[]): Card[] {
@@ -121,16 +204,22 @@ export function playTurn(state: GameState, action: Action): GameState {
   if (action.type === 'pass') {
     const next = nextActivePlayer(state, state.currentPlayer);
     let lastPlay = state.lastPlay;
+    let lastPlayOwner = state.lastPlayOwner;
     let passesInRow = state.passesInRow + 1;
     // if everyone except lastPlayOwner has passed and we return to owner
     // we DO NOT clear tablePlays here anymore, as requested.
     // Only clear when game ends or new game starts.
     let tablePlays = state.tablePlays ?? [];
+    let currentTrickPlays = state.currentTrickPlays ?? [];
+
     if (state.lastPlay && next === state.lastPlay.by && passesInRow >= activePlayersCount(state) - 1) {
-      // tablePlays = []; // Don't clear table plays on trick end
+      lastPlay = null;
+      lastPlayOwner = null;
       passesInRow = 0;
+      currentTrickPlays = [];
     }
-    return { ...state, currentPlayer: next, lastPlay, passesInRow, tablePlays };
+
+    return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays };
   }
   // play cards
   const hand = state.hands[state.currentPlayer];

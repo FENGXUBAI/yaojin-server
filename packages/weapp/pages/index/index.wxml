@@ -1,0 +1,67 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- Logo -->
+  <view class="logo-section">
+    <view class="logo-placeholder">
+      <text class="logo-text">要</text>
+    </view>
+    <text class="title">要进</text>
+    <text class="subtitle">经典斗地主 · 快乐竞技</text>
+  </view>
+
+  <!-- 主菜单 -->
+  <view class="menu-section">
+    <button class="menu-btn primary" bindtap="onQuickMatch">
+      <text class="btn-icon">🎮</text>
+      <text class="btn-text">快速匹配</text>
+    </button>
+    
+    <button class="menu-btn secondary" bindtap="onCreateRoom">
+      <text class="btn-icon">🏠</text>
+      <text class="btn-text">创建房间</text>
+    </button>
+    
+    <button class="menu-btn secondary" bindtap="onJoinRoom">
+      <text class="btn-icon">🚪</text>
+      <text class="btn-text">加入房间</text>
+    </button>
+  </view>
+
+  <!-- 底部导航 -->
+  <view class="bottom-nav">
+    <view class="nav-item" bindtap="onProfile">
+      <text class="nav-icon">👤</text>
+      <text class="nav-text">我的</text>
+    </view>
+    <view class="nav-item" bindtap="onRank">
+      <text class="nav-icon">🏆</text>
+      <text class="nav-text">排行榜</text>
+    </view>
+    <view class="nav-item" bindtap="onSettings">
+      <text class="nav-icon">⚙️</text>
+      <text class="nav-text">设置</text>
+    </view>
+  </view>
+
+  <!-- 加入房间弹窗 -->
+  <view class="modal" wx:if="{{showJoinModal}}">
+    <view class="modal-content">
+      <text class="modal-title">加入房间</text>
+      <input class="modal-input" placeholder="请输入房间号" bindinput="onRoomIdInput" value="{{roomId}}" />
+      <view class="modal-buttons">
+        <button class="modal-btn cancel" bindtap="onCancelJoin">取消</button>
+        <button class="modal-btn confirm" bindtap="onConfirmJoin">加入</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 匹配中弹窗 -->
+  <view class="modal" wx:if="{{isMatching}}">
+    <view class="modal-content matching">
+      <view class="loading-spinner"></view>
+      <text class="matching-text">正在匹配中...</text>
+      <text class="matching-time">{{matchingTime}}s</text>
+      <button class="modal-btn cancel" bindtap="onCancelMatch">取消匹配</button>
+    </view>
+  </view>
+</view>

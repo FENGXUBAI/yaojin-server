@@ -64,8 +64,9 @@ describe('Card Patterns', () => {
 
 describe('Comparison Logic', () => {
   test('Single vs Single', () => {
-    const small = detectPattern([C('3')])!;
-    const big = detectPattern([C('2')])!;
+    // This game uses single ordering: 3 > 2 > A > K ... > 4
+    const small = detectPattern([C('2')])!;
+    const big = detectPattern([C('3')])!;
     expect(canBeat(small, big)).toBe(true);
     expect(canBeat(big, small)).toBe(false);
   });
@@ -192,17 +193,17 @@ describe('Tribute & Revolution', () => {
 
     const newHands = applyTribute(hands, plan);
     
-    // P2 gave A to P1
+    // P2 gave 3 to P1 (3 is the biggest in this game)
     expect(newHands[2]).toHaveLength(1);
-    expect(newHands[2][0].rank).toBe('3');
+    expect(newHands[2][0].rank).toBe('A');
     expect(newHands[1]).toHaveLength(1);
-    expect(newHands[1][0].rank).toBe('A');
+    expect(newHands[1][0].rank).toBe('3');
     
-    // P3 gave 2, K to P0
+    // P3 gave 3, 2 to P0 (3 then 2 are the biggest)
     expect(newHands[3]).toHaveLength(1);
-    expect(newHands[3][0].rank).toBe('3');
+    expect(newHands[3][0].rank).toBe('K');
     expect(newHands[0]).toHaveLength(2);
     expect(newHands[0].map(c => c.rank)).toContain('2');
-    expect(newHands[0].map(c => c.rank)).toContain('K');
+    expect(newHands[0].map(c => c.rank)).toContain('3');
   });
 });

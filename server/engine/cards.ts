@@ -8,6 +8,7 @@ export interface Card {
   rank: Rank;
   isJoker: boolean;
   sortValue: number; // for singles/pairs/triple/four ordering
+  isTribute?: boolean; // Highlight for tribute
 }
 
 export const normalRanks: NormalRank[] = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
@@ -86,4 +87,38 @@ export function nextInRing(r: NormalRank): NormalRank | null {
   if (i === undefined) return null;
   const j = (i + 1);
   return straightRing[j] ?? null;
+}
+
+export function findStraightRuns(ranks: string[]): string[][] {
+  // ranks must be NormalRank strings present in hand (unique)
+  const present = new Set(ranks);
+  const runs: string[][] = [];
+
+  // Build runs based on straightRing order
+  let i = 0;
+  while (i < straightRing.length) {
+    const start = straightRing[i];
+    if (!present.has(start)) {
+      i++;
+      continue;
+    }
+    const run: string[] = [start];
+    let cur = start;
+    while (true) {
+      const nxt = nextInRing(cur);
+      if (!nxt) break;
+      if (!present.has(nxt)) break;
+      run.push(nxt);
+      cur = nxt;
+    }
+    runs.push(run);
+    i += run.length;
+  }
+
+  // Special A-2-3 presence: if A,2,3 exist we also allow that as a run
+  if (present.has('A') && present.has('2') && present.has('3')) {
+    runs.push(['A', '2', '3']);
+  }
+
+  return runs;
 }

@@ -2,11 +2,16 @@
   "compilerOptions": {
     "target": "es2018",
     "module": "commonjs",
-    "outDir": "./dist",
+    "outDir": "./dist-server",
     "rootDir": "./",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "noEmit": false
+  },
+  "include": ["*.ts", "engine/**/*.ts"],
+  "exclude": ["node_modules", "dist-server", "index-v2.ts", "auth.ts", "database.ts", "matchmaker.ts"]
 }

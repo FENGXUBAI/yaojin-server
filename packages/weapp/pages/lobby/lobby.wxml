@@ -1,0 +1,137 @@
+<!--pages/lobby/lobby.wxml - 游戏大厅-->
+<view class="lobby-container">
+  <!-- 顶部用户信息 -->
+  <view class="user-banner">
+    <image class="user-avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" />
+    <view class="user-info">
+      <text class="user-name">{{userInfo.nickname || '游客'}}</text>
+      <view class="user-stats">
+        <text class="coins">💰 {{userInfo.coins || 0}}</text>
+        <text class="diamonds">💎 {{userInfo.diamonds || 0}}</text>
+      </view>
+    </view>
+    <view class="level-badge">Lv.{{userInfo.level || 1}}</view>
+  </view>
+
+  <!-- 公告栏 -->
+  <view class="notice-bar" wx:if="{{notice}}">
+    <text class="notice-icon">📢</text>
+    <text class="notice-text">{{notice}}</text>
+  </view>
+
+  <!-- 主要操作区 -->
+  <view class="main-actions">
+    <!-- 快速开始 -->
+    <view class="action-card quick-start" bindtap="quickMatch">
+      <image class="action-bg" src="/images/bg-quick.png" mode="aspectFill" />
+      <view class="action-content">
+        <text class="action-title">快速开始</text>
+        <text class="action-desc">自动匹配玩家</text>
+        <view class="action-btn">
+          <text>立即匹配</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 好友房间 -->
+    <view class="action-card friend-room" bindtap="showRoomActions">
+      <image class="action-bg" src="/images/bg-friend.png" mode="aspectFill" />
+      <view class="action-content">
+        <text class="action-title">好友房间</text>
+        <text class="action-desc">和好友一起玩</text>
+        <view class="action-btn">
+          <text>进入</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 比赛场 -->
+    <view class="action-card tournament" bindtap="showTournament">
+      <image class="action-bg" src="/images/bg-tournament.png" mode="aspectFill" />
+      <view class="action-content">
+        <text class="action-title">比赛场</text>
+        <text class="action-desc">赢取大奖</text>
+        <view class="action-btn">
+          <text>即将开放</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快捷功能 -->
+  <view class="quick-features">
+    <view class="feature-item" bindtap="goToRank">
+      <text class="feature-icon">🏆</text>
+      <text class="feature-name">排行榜</text>
+    </view>
+    <view class="feature-item" bindtap="goToMail">
+      <text class="feature-icon">📬</text>
+      <text class="feature-name">邮件</text>
+      <text class="badge" wx:if="{{unreadMails > 0}}">{{unreadMails}}</text>
+    </view>
+    <view class="feature-item" bindtap="goToShop">
+      <text class="feature-icon">🛒</text>
+      <text class="feature-name">商城</text>
+    </view>
+    <view class="feature-item" bindtap="goToTask">
+      <text class="feature-icon">📋</text>
+      <text class="feature-name">任务</text>
+      <text class="badge" wx:if="{{pendingTasks > 0}}">{{pendingTasks}}</text>
+    </view>
+  </view>
+
+  <!-- 房间列表模态框 -->
+  <view class="modal-overlay" wx:if="{{showRoomModal}}" bindtap="closeRoomModal">
+    <view class="modal-content" catchtap="">
+      <text class="modal-title">好友房间</text>
+      
+      <view class="room-tabs">
+        <text class="tab {{roomTab === 'create' ? 'active' : ''}}" bindtap="switchRoomTab" data-tab="create">创建房间</text>
+        <text class="tab {{roomTab === 'join' ? 'active' : ''}}" bindtap="switchRoomTab" data-tab="join">加入房间</text>
+      </view>
+
+      <!-- 创建房间 -->
+      <view class="tab-content" wx:if="{{roomTab === 'create'}}">
+        <view class="form-item">
+          <text class="label">房间名称</text>
+          <input class="input" placeholder="输入房间名称" value="{{newRoomName}}" bindinput="onRoomNameInput"/>
+        </view>
+        <view class="form-item">
+          <text class="label">人数</text>
+          <view class="player-count">
+            <text class="count-btn {{playerCount === 3 ? 'active' : ''}}" bindtap="setPlayerCount" data-count="3">3人</text>
+            <text class="count-btn {{playerCount === 4 ? 'active' : ''}}" bindtap="setPlayerCount" data-count="4">4人</text>
+          </view>
+        </view>
+        <view class="btn btn-success" bindtap="createRoom">创建房间</view>
+      </view>
+
+      <!-- 加入房间 -->
+      <view class="tab-content" wx:if="{{roomTab === 'join'}}">
+        <view class="form-item">
+          <text class="label">房间号</text>
+          <input class="input" placeholder="输入房间号" value="{{joinRoomId}}" bindinput="onJoinRoomInput"/>
+        </view>
+        <view class="btn btn-primary" bindtap="joinRoom">加入房间</view>
+        
+        <view class="room-list" wx:if="{{roomList.length > 0}}">
+          <text class="list-title">当前房间</text>
+          <view class="room-item" wx:for="{{roomList}}" wx:key="id" bindtap="joinRoomById" data-id="{{item.id}}">
+            <text class="room-name">{{item.name || '房间' + item.id}}</text>
+            <text class="room-players">{{item.playerCount}}/{{item.maxPlayers}}人</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 匹配中动画 -->
+  <view class="matching-overlay" wx:if="{{isMatching}}">
+    <view class="matching-content">
+      <view class="loading-spinner"></view>
+      <text class="matching-text">正在匹配中...</text>
+      <text class="matching-time">{{matchTime}}s</text>
+      <view class="btn btn-danger" bindtap="cancelMatch">取消匹配</view>
+    </view>
+  </view>
+</view>
