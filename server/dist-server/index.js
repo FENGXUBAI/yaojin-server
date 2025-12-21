@@ -131,6 +131,158 @@ app.get('/api/user/profile', (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ============== 房间 HTTP API ==============
+// 生成房间ID
+function generateRoomId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+// HTTP 房间存储（与 Socket.IO 房间分开）
+const httpRooms = new Map();
+// 创建房间
+app.post('/api/room/create', (req, res) => {
+    try {
+        const { playerCount = 3, playerName = '玩家' } = req.body || {};
+        // 生成唯一房间ID
+        let roomId = generateRoomId();
+        while (httpRooms.has(roomId)) {
+            roomId = generateRoomId();
+        }
+        // 生成玩家ID
+        const playerId = `player_${crypto_1.default.randomBytes(8).toString('hex')}`;
+        const room = {
+            id: roomId,
+            ownerId: playerId,
+            ownerName: playerName,
+            playerCount,
+            players: [{ id: playerId, name: playerName, ready: true }],
+            createdAt: Date.now()
+        };
+        httpRooms.set(roomId, room);
+        console.log(`[房间] 创建房间: ${roomId} by ${playerName}`);
+        res.json({
+            roomId,
+            playerId,
+            room: {
+                id: roomId,
+                players: room.players,
+                playerCount,
+                isOwner: true
+            }
+        });
+    }
+    catch (error) {
+        console.error('[房间] 创建失败:', error);
+        res.status(500).json({ error: error.message || '创建房间失败' });
+    }
+});
+// 加入房间
+app.post('/api/room/join', (req, res) => {
+    try {
+        const { roomId, playerName = '玩家' } = req.body || {};
+        if (!roomId) {
+            return res.status(400).json({ error: '请提供房间号' });
+        }
+        const room = httpRooms.get(roomId.toUpperCase());
+        if (!room) {
+            return res.status(404).json({ error: '房间不存在' });
+        }
+        if (room.players.length >= room.playerCount) {
+            return res.status(400).json({ error: '房间已满' });
+        }
+        const playerId = `player_${crypto_1.default.randomBytes(8).toString('hex')}`;
+        room.players.push({ id: playerId, name: playerName, ready: false });
+        console.log(`[房间] ${playerName} 加入房间: ${roomId}`);
+        res.json({
+            roomId: room.id,
+            playerId,
+            room: {
+                id: room.id,
+                players: room.players,
+                playerCount: room.playerCount,
+                isOwner: false
+            }
+        });
+    }
+    catch (error) {
+        console.error('[房间] 加入失败:', error);
+        res.status(500).json({ error: error.message || '加入房间失败' });
+    }
+});
+// 快速匹配（简化版：直接创建带机器人的房间）
+app.post('/api/match/quick', (req, res) => {
+    try {
+        const { playerCount = 3, playerName = '玩家' } = req.body || {};
+        // 生成房间
+        let roomId = generateRoomId();
+        while (httpRooms.has(roomId)) {
+            roomId = generateRoomId();
+        }
+        const playerId = `player_${crypto_1.default.randomBytes(8).toString('hex')}`;
+        // 创建带机器人的房间
+        const players = [
+            { id: playerId, name: playerName, ready: true }
+        ];
+        // 添加机器人
+        const botNames = ['小明', '小红', '小刚', '小美', '阿强'];
+        for (let i = 1; i < playerCount; i++) {
+            players.push({
+                id: `bot_${i}`,
+                name: botNames[Math.floor(Math.random() * botNames.length)] + (i > 1 ? i : ''),
+                ready: true
+            });
+        }
+        const room = {
+            id: roomId,
+            ownerId: playerId,
+            ownerName: playerName,
+            playerCount,
+            players,
+            createdAt: Date.now()
+        };
+        httpRooms.set(roomId, room);
+        console.log(`[匹配] 快速匹配成功: ${roomId} for ${playerName}`);
+        res.json({
+            roomId,
+            playerId,
+            matched: true,
+            room: {
+                id: roomId,
+                players: room.players,
+                playerCount
+            }
+        });
+    }
+    catch (error) {
+        console.error('[匹配] 匹配失败:', error);
+        res.status(500).json({ error: error.message || '匹配失败' });
+    }
+});
+// 获取房间信息
+app.get('/api/room/:roomId', (req, res) => {
+    try {
+        const { roomId } = req.params;
+        const room = httpRooms.get(roomId.toUpperCase());
+        if (!room) {
+            return res.status(404).json({ error: '房间不存在' });
+        }
+        res.json({
+            room: {
+                id: room.id,
+                players: room.players,
+                playerCount: room.playerCount,
+                ownerId: room.ownerId
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // ============== 静态文件服务 ==============
 // Serve static files from the React Native Web build
 // Disable caching to avoid clients getting stale JS bundles after redeploy.

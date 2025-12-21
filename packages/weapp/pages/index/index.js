@@ -39,8 +39,6 @@ Page({
 
   // 快速匹配
   onQuickMatch() {
-    if (!this.checkConnection()) return;
-    
     this.setData({
       isMatching: true,
       matchingTime: 0
@@ -56,7 +54,8 @@ Page({
     // 发送匹配请求
     app.quickMatch(3, this.data.userInfo?.nickname || '玩家')
       .then(result => {
-        wx.hideLoading();
+        this.clearMatchingTimer();
+        this.setData({ isMatching: false });
         if (result.roomId) {
           wx.navigateTo({
             url: `/pages/game/game?roomId=${result.roomId}`
@@ -64,7 +63,8 @@ Page({
         }
       })
       .catch(err => {
-        wx.hideLoading();
+        this.clearMatchingTimer();
+        this.setData({ isMatching: false });
         wx.showToast({ title: err.message || '匹配失败', icon: 'none' });
       });
   },
@@ -84,8 +84,6 @@ Page({
 
   // 创建房间
   onCreateRoom() {
-    if (!this.checkConnection()) return;
-
     wx.showLoading({ title: '创建中...' });
 
     app.createRoom(3, this.data.userInfo?.nickname || '玩家')
@@ -151,6 +149,7 @@ Page({
   // 检查连接
   checkConnection() {
     return app.globalData.isConnected;
+  },
 
   // 跳转个人中心
   onProfile() {
