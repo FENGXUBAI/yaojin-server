@@ -40,7 +40,7 @@ Page({
       const loginRes = await this.wxLogin();
       
       // 3. 发送到服务器换取 token
-      const result = await this.serverLogin(loginRes.code, userProfile.userInfo);
+      const result = await app.wechatLogin(loginRes.code, userProfile.userInfo.nickName, userProfile.userInfo.avatarUrl);
 
       // 4. 保存登录状态
       wx.setStorageSync('token', result.token);
@@ -80,21 +80,7 @@ Page({
       const nickname = `玩家${randomNum}`;
 
       // 调用游客登录接口
-      const result = await new Promise((resolve, reject) => {
-        wx.request({
-          url: `${app.globalData.apiUrl}/api/auth/guest`,
-          method: 'POST',
-          data: { nickname },
-          success: (res) => {
-            if (res.statusCode === 200) {
-              resolve(res.data);
-            } else {
-              reject(new Error(res.data?.error || '请求失败'));
-            }
-          },
-          fail: (err) => reject(err)
-        });
-      });
+      const result = await app.guestLogin(nickname);
 
       // 保存登录状态
       wx.setStorageSync('token', result.token);
@@ -104,9 +90,6 @@ Page({
 
       wx.hideLoading();
       wx.showToast({ title: '登录成功', icon: 'success' });
-
-      // 连接服务器
-      app.connectServer();
 
       // 跳转首页
       setTimeout(() => {
@@ -118,7 +101,7 @@ Page({
     } catch (error) {
       wx.hideLoading();
       console.error('游客登录失败:', error);
-      wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
+      wx.showToast({ title: error.message || '登录失败，请稍后重试', icon: 'none' });
     }
   },
 
@@ -138,29 +121,6 @@ Page({
     return new Promise((resolve, reject) => {
       wx.login({
         success: resolve,
-        fail: reject
-      });
-    });
-  },
-
-  // 服务器登录
-  serverLogin(code, userInfo) {
-    return new Promise((resolve, reject) => {
-      wx.request({
-        url: `${app.globalData.apiUrl}/api/auth/wechat`,
-        method: 'POST',
-        data: {
-          code,
-          nickname: userInfo.nickName,
-          avatarUrl: userInfo.avatarUrl
-        },
-        success: (res) => {
-          if (res.statusCode === 200) {
-            resolve(res.data);
-          } else {
-            reject(new Error(res.data?.error || '登录失败'));
-          }
-        },
         fail: reject
       });
     });

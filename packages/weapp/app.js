@@ -3,21 +3,19 @@
  */
 
 // 服务器地址配置 - 已部署到 Koyeb
-const SERVER_URL = 'wss://wise-galliform-zanli-2885a498.koyeb.app';
 const API_URL = 'https://wise-galliform-zanli-2885a498.koyeb.app';
 
 App({
   globalData: {
     userInfo: null,
     token: null,
-    socket: null,
-    serverUrl: SERVER_URL,
     apiUrl: API_URL,
     appName: '要进',
     isConnected: false,
     matchCallback: null,
     roomCallback: null,
-    errorCallback: null
+    errorCallback: null,
+    messageHandlers: {}
   },
 
   onLaunch() {
@@ -35,102 +33,11 @@ App({
     if (token && userInfo) {
       this.globalData.token = token;
       this.globalData.userInfo = userInfo;
-      
-      // 自动连接服务器
-      this.connectServer();
-    }
-  },
-
-  // 连接服务器
-  connectServer() {
-    if (this.globalData.socket) {
-      return;
-    }
-
-    const socket = wx.connectSocket({
-      url: this.globalData.serverUrl,
-      success: () => {
-        console.log('WebSocket 连接中...');
-      },
-      fail: (err) => {
-        console.error('WebSocket 连接失败:', err);
-      }
-    });
-
-    socket.onOpen(() => {
-      console.log('WebSocket 已连接');
       this.globalData.isConnected = true;
-      this.globalData.socket = socket;
-    });
-
-    socket.onMessage((res) => {
-      try {
-        const data = JSON.parse(res.data);
-        this.handleMessage(data);
-      } catch (e) {
-        console.error('消息解析失败:', e);
-      }
-    });
-
-    socket.onClose(() => {
-      console.log('WebSocket 已断开');
-      this.globalData.isConnected = false;
-      this.globalData.socket = null;
-      
-      // 5秒后重连
-      setTimeout(() => {
-        if (this.globalData.token) {
-          this.connectServer();
-        }
-      }, 5000);
-    });
-
-    socket.onError((err) => {
-      console.error('WebSocket 错误:', err);
-    });
-  },
-
-  // 处理服务器消息
-  handleMessage(data) {
-    const { type, payload } = data;
-    
-    switch (type) {
-      case 'matchSuccess':
-        if (this.globalData.matchCallback) {
-          this.globalData.matchCallback(payload.roomId);
-        }
-        break;
-        
-      case 'roomCreated':
-      case 'roomJoined':
-        if (this.globalData.roomCallback) {
-          this.globalData.roomCallback(payload.roomId);
-        }
-        break;
-        
-      case 'error':
-        if (this.globalData.errorCallback) {
-          this.globalData.errorCallback(payload.message);
-        }
-        wx.showToast({ title: payload.message, icon: 'none' });
-        break;
     }
   },
 
-  // 发送消息
-  sendMessage(type, data) {
-    if (!this.globalData.socket || !this.globalData.isConnected) {
-      wx.showToast({ title: '未连接服务器', icon: 'none' });
-      return false;
-    }
-    
-    this.globalData.socket.send({
-      data: JSON.stringify({ type, data })
-    });
-    return true;
-  },
-
-  // HTTP 请求封装
+  // HTTP 请求封装（带认证）
   request(options) {
     return new Promise((resolve, reject) => {
       wx.request({
@@ -145,11 +52,85 @@ App({
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(res.data);
           } else {
-            reject(new Error(res.data?.error || '请求失败'));
+            reject(new Error(res.data?.error || `请求失败 (${res.statusCode})`));
           }
         },
-        fail: reject
+        fail: (err) => {
+          console.error('请求失败:', err);
+          reject(new Error(err.errMsg || '网络请求失败'));
+        }
       });
+    });
+  },
+
+  // 游客登录
+  guestLogin(nickname) {
+    return this.request({
+      url: '/api/auth/guest',
+      method: 'POST',
+      data: { nickname: nickname || undefined }
+    });
+  },
+
+  // 微信登录
+  wechatLogin(code, nickname, avatarUrl) {
+    return this.request({
+      url: '/api/auth/wechat',
+      method: 'POST',
+      data: { code, nickname, avatarUrl }
+    });
+  },
+
+  // 获取用户信息
+  getUserProfile() {
+    return this.request({
+      url: '/api/user/profile',
+      method: 'GET'
+    });
+  },
+
+  // 注册事件处理器
+  on(eventName, handler) {
+    this.globalData.messageHandlers[eventName] = handler;
+  },
+
+  // 移除事件处理器
+  off(eventName) {
+    delete this.globalData.messageHandlers[eventName];
+  },
+
+  // 发送事件（当前为 HTTP 方式，可扩展）
+  emit(eventName, data) {
+    console.log(`发送事件: ${eventName}`, data);
+    // 这里可以扩展为 HTTP API 调用或 WebSocket 事件
+    // 暂时只记录日志
+    return true;
+  },
+
+  // 快速匹配（HTTP 轮询版本）
+  quickMatch(playerCount = 3, playerName = '玩家') {
+    return this.request({
+      url: '/api/match/quick',
+      method: 'POST',
+      data: { playerCount, playerName }
+    });
+  },
+
+  // 创建房间
+  createRoom(playerCount = 3, playerName = '玩家') {
+    return this.request({
+      url: '/api/room/create',
+      method: 'POST',
+      data: { playerCount, playerName }
+    });
+  },
+
+  // 加入房间
+  joinRoom(roomId, playerName = '玩家') {
+    return this.request({
+      url: '/api/room/join',
+      method: 'POST',
+      data: { roomId, playerName }
     });
   }
 });

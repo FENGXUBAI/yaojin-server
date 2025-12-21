@@ -54,40 +54,25 @@ Page({
     }, 1000);
 
     // 发送匹配请求
-    app.globalData.socket.send({
-      data: JSON.stringify({
-        type: 'quickMatch',
-        data: {
-          playerCount: 3,
-          name: this.data.userInfo?.nickname || '玩家',
-          level: this.data.userInfo?.level || 1
+    app.quickMatch(3, this.data.userInfo?.nickname || '玩家')
+      .then(result => {
+        wx.hideLoading();
+        if (result.roomId) {
+          wx.navigateTo({
+            url: `/pages/game/game?roomId=${result.roomId}`
+          });
         }
       })
-    });
-
-    // 监听匹配成功
-    app.globalData.matchCallback = (roomId) => {
-      this.clearMatchingTimer();
-      this.setData({ isMatching: false });
-      
-      wx.navigateTo({
-        url: `/pages/game/game?roomId=${roomId}`
+      .catch(err => {
+        wx.hideLoading();
+        wx.showToast({ title: err.message || '匹配失败', icon: 'none' });
       });
-    };
   },
 
   // 取消匹配
   onCancelMatch() {
     this.clearMatchingTimer();
     this.setData({ isMatching: false });
-
-    if (app.globalData.socket) {
-      app.globalData.socket.send({
-        data: JSON.stringify({
-          type: 'cancelMatch'
-        })
-      });
-    }
   },
 
   clearMatchingTimer() {
@@ -103,23 +88,17 @@ Page({
 
     wx.showLoading({ title: '创建中...' });
 
-    app.globalData.socket.send({
-      data: JSON.stringify({
-        type: 'createRoom',
-        data: {
-          name: this.data.userInfo?.nickname || '玩家',
-          playerCount: 3
-        }
+    app.createRoom(3, this.data.userInfo?.nickname || '玩家')
+      .then(result => {
+        wx.hideLoading();
+        wx.navigateTo({
+          url: `/pages/lobby/lobby?roomId=${result.roomId}&isOwner=true`
+        });
       })
-    });
-
-    // 监听房间创建成功
-    app.globalData.roomCallback = (roomId) => {
-      wx.hideLoading();
-      wx.navigateTo({
-        url: `/pages/lobby/lobby?roomId=${roomId}&isOwner=true`
+      .catch(err => {
+        wx.hideLoading();
+        wx.showToast({ title: err.message || '创建失败', icon: 'none' });
       });
-    };
   },
 
   // 显示加入房间弹窗
@@ -153,45 +132,25 @@ Page({
       return;
     }
 
-    if (!this.checkConnection()) return;
-
     wx.showLoading({ title: '加入中...' });
 
-    app.globalData.socket.send({
-      data: JSON.stringify({
-        type: 'joinRoom',
-        data: {
-          roomId: roomId,
-          name: this.data.userInfo?.nickname || '玩家'
-        }
+    app.joinRoom(roomId, this.data.userInfo?.nickname || '玩家')
+      .then(result => {
+        wx.hideLoading();
+        this.setData({ showJoinModal: false });
+        wx.navigateTo({
+          url: `/pages/lobby/lobby?roomId=${result.roomId}&isOwner=false`
+        });
       })
-    });
-
-    // 监听加入成功
-    app.globalData.roomCallback = (roomId) => {
-      wx.hideLoading();
-      this.setData({ showJoinModal: false });
-      wx.navigateTo({
-        url: `/pages/lobby/lobby?roomId=${roomId}&isOwner=false`
+      .catch(err => {
+        wx.hideLoading();
+        wx.showToast({ title: err.message || '加入失败', icon: 'none' });
       });
-    };
-
-    // 监听错误
-    app.globalData.errorCallback = (msg) => {
-      wx.hideLoading();
-      wx.showToast({ title: msg, icon: 'none' });
-    };
   },
 
   // 检查连接
   checkConnection() {
-    if (!app.globalData.isConnected) {
-      wx.showToast({ title: '正在连接服务器...', icon: 'loading' });
-      app.connectServer();
-      return false;
-    }
-    return true;
-  },
+    return app.globalData.isConnected;
 
   // 跳转个人中心
   onProfile() {
