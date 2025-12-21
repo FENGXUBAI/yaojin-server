@@ -4,7 +4,9 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "expo start",
+    "start": "node server/dist-server/index.js",
+    "build": "cd server && npm install && npm run build",
+    "start:client": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
