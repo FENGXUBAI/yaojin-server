@@ -166,9 +166,20 @@ app.use(
 );
 
 // Fallback to index.html for SPA routing (if any)
+// Only send file if it exists, otherwise return 404
+const fs = require('fs');
+const indexPath = path.join(distPath, 'index.html');
 app.use((req, res) => {
+  // Skip API routes that weren't matched
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
   res.setHeader('Cache-Control', 'no-store');
-  res.sendFile(path.join(distPath, 'index.html'));
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('Not Found');
+  }
 });
 
 const io = new Server(httpServer, {
