@@ -388,7 +388,8 @@ const Patterns = {
   /**
    * 获取牌型名称
    */
-  getTypeName(pattern) {
+  getTypeName(typeOrPattern) {
+    const type = typeof typeOrPattern === 'object' ? typeOrPattern.type : typeOrPattern;
     const names = {
       [this.TYPES.SINGLE]: '单张',
       [this.TYPES.PAIR]: '对子',
@@ -399,7 +400,7 @@ const Patterns = {
       [this.TYPES.HONG]: '轰',
       [this.TYPES.ROCKET]: '王炸'
     };
-    return names[pattern.type] || '';
+    return names[type] || '';
   }
 };
 
