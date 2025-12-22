@@ -1,45 +1,23 @@
 {
-  "name": "yaojin",
-  "version": "0.1.0",
-  "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "name": "yaojin-server",
+  "version": "2.0.0",
+  "description": "要进游戏服务器",
+  "main": "dist-server/index.js",
   "scripts": {
-    "start": "node server/dist-server/index.js",
-    "build": "cd server && npm install && npm run build",
-    "start:client": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
-    "gen:sfx": "node ./scripts/generate_sfx.js",
-    "test": "jest"
+    "build": "tsc",
+    "start": "node dist-server/index.js",
+    "dev": "npx ts-node index.ts"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~3.2.3",
-    "@types/express": "^5.0.5",
-    "expo": "^51.0.0",
-    "expo-av": "~14.0.7",
-    "expo-linear-gradient": "~13.0.2",
-    "expo-status-bar": "^1.12.1",
-    "express": "^5.1.0",
-    "react": "^18.2.0",
-    "react-dom": "18.2.0",
-    "react-native": "^0.74.0",
-    "react-native-web": "~0.19.10",
-    "socket.io-client": "^4.8.1"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.5"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.11",
-    "@types/react": "^18.2.39",
-    "@types/react-native": "^0.73.0",
-    "jest": "^29.7.0",
-    "jest-expo": "^51.0.0",
-    "ts-jest": "^29.1.1",
-    "typescript": "^5.6.3"
-  },
-  "jest": {
-    "preset": "jest-expo",
-    "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
-    ]
+    "typescript": "^5.3.3",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0"
   }
 }

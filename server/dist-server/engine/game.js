@@ -88,6 +88,7 @@ function initGame(opts) {
         status: pendingReturns.length > 0 ? 'tribute_return' : 'playing',
         pendingReturns,
         multiplier: 1,
+        jiefengState: null,
     };
 }
 function removeCardsFromHand(hand, toRemove) {
@@ -137,6 +138,38 @@ function playTurn(state, action) {
         return { ...state, currentPlayer: nextActivePlayer(state, state.currentPlayer) };
     }
     if (action.type === 'pass') {
+        // 接风逻辑处理
+        if (state.jiefengState) {
+            const jf = state.jiefengState;
+            // 当前检查的玩家选择不压牌
+            const newSkipped = [...jf.skippedPlayers, state.currentPlayer];
+            // 找下一个要检查的玩家（跳过已经pass的、跑了的、以及下家）
+            let nextChecker = nextActivePlayer(state, state.currentPlayer);
+            // 如果转了一圈回到下家，或者只剩下家了，则下家接风
+            if (nextChecker === jf.nextPlayer || nextChecker === -1) {
+                // 接风成功：下家可以自由出牌
+                return {
+                    ...state,
+                    currentPlayer: jf.nextPlayer,
+                    lastPlay: null, // 自由出牌
+                    lastPlayOwner: null,
+                    passesInRow: 0,
+                    jiefengState: null,
+                    currentTrickPlays: [],
+                };
+            }
+            // 还有其他玩家需要检查
+            return {
+                ...state,
+                currentPlayer: nextChecker,
+                jiefengState: {
+                    ...jf,
+                    checkingPlayer: nextChecker,
+                    skippedPlayers: newSkipped,
+                },
+            };
+        }
+        // 正常pass逻辑
         const next = nextActivePlayer(state, state.currentPlayer);
         let lastPlay = state.lastPlay;
         let lastPlayOwner = state.lastPlayOwner;
@@ -154,7 +187,7 @@ function playTurn(state, action) {
             passesInRow = 0;
             currentTrickPlays = [];
         }
-        return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays };
+        return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays, jiefengState: null };
     }
     // play cards
     const hand = state.hands[state.currentPlayer];
@@ -162,6 +195,9 @@ function playTurn(state, action) {
     if (!pattern) {
         throw new Error('非法牌型');
     }
+    // 接风状态下有人选择出牌（压牌成功）：取消接风，正常继续游戏
+    // 接风状态下，压牌成功后，游戏继续正常流程
+    const wasInJiefeng = state.jiefengState !== null;
     // Check if we are starting a new trick (because everyone passed back to us)
     // BUT we must allow "Qi" logic to happen first if applicable.
     let effectiveLastPlay = state.lastPlay;
@@ -240,6 +276,7 @@ function playTurn(state, action) {
                 tablePlays: newTablePlays,
                 currentTrickPlays: newCurrentTrickPlays,
                 multiplier: newMultiplier,
+                jiefengState: null, // 起炸/起轰时清除接风状态
             };
             return nextState;
         }
@@ -313,10 +350,40 @@ function playTurn(state, action) {
     if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {
         newMultiplier *= 2; // Additional x2 for 4s bomb (Total x4)
     }
+    // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
+    let jiefengState = null;
+    const playerJustFinished = newHand.length === 0 && !state.finishedOrder.includes(state.currentPlayer);
+    if (playerJustFinished && finishedOrder.length < state.playerCount) {
+        // 玩家刚刚跑了，开始接风流程
+        const finishedPlayer = state.currentPlayer;
+        const lastPlayPattern = { ...pattern, by: state.currentPlayer };
+        // 找到下家（跑了的人的下一个未完成的玩家）
+        const nextAfterFinished = nextActivePlayer({ ...state, finishedOrder }, finishedPlayer);
+        if (nextAfterFinished !== -1) {
+            // 找到下家之后的下一个人来检查是否能压牌
+            const checkingPlayer = nextActivePlayer({ ...state, finishedOrder }, nextAfterFinished);
+            if (checkingPlayer !== -1 && checkingPlayer !== nextAfterFinished) {
+                // 有其他玩家需要检查，进入接风流程
+                jiefengState = {
+                    finishedPlayer,
+                    lastPlayCards: lastPlayPattern,
+                    nextPlayer: nextAfterFinished,
+                    checkingPlayer,
+                    skippedPlayers: [],
+                };
+                nextPlayer = checkingPlayer; // 先让检查的玩家决定是否要压
+            }
+            else {
+                // 只剩一个活跃玩家，直接接风
+                nextPlayer = nextAfterFinished;
+                // 不设置接风状态，因为这个玩家可以自由出牌（lastPlay会被清空）
+            }
+        }
+    }
     const next = {
         ...state,
         hands: newHands,
-        lastPlay: { ...pattern, by: state.currentPlayer },
+        lastPlay: jiefengState ? { ...pattern, by: state.currentPlayer } : { ...pattern, by: state.currentPlayer },
         lastPlayOwner: state.currentPlayer,
         passesInRow: 0,
         currentPlayer: nextPlayer,
@@ -324,6 +391,7 @@ function playTurn(state, action) {
         tablePlays: finalTablePlays,
         currentTrickPlays: newCurrentTrickPlays,
         multiplier: newMultiplier,
+        jiefengState,
     };
     return next;
 }
@@ -366,6 +434,7 @@ function forceWin(state, playerIndex) {
         lastPlayOwner: null,
         tablePlays: [], // Clear table
         currentTrickPlays: [],
+        jiefengState: null, // 清除接风状态
     };
 }
 function checkRevolution(hands, finishedOrder) {
