@@ -148,6 +148,9 @@ describe('Special Rules: Qi Zha / Qi Hong', () => {
     // P1 has two 4s
     const pair4 = [C('4'), C('4', '♥')];
     state1.hands[1] = [...pair4];
+    // Note: After P0 finishes (runs out of cards), jiefeng logic kicks in
+    // which sets currentPlayer to P2 (for checking). We manually set to P1 for this test.
+    state1.currentPlayer = 1;
     
     // P1 plays two 4s to take the triple
     const state2 = playTurn(state1, { type: 'play', cards: pair4 });

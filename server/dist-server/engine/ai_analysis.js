@@ -6,11 +6,10 @@ const cards_1 = require("./cards");
 const patterns_1 = require("./patterns");
 // Helper to count cards by rank
 function countRanks(hand) {
-    var _a;
     const counts = new Map();
     for (const c of hand) {
         const r = c.isJoker ? c.rank : c.rank;
-        const list = (_a = counts.get(r)) !== null && _a !== void 0 ? _a : [];
+        const list = counts.get(r) ?? [];
         list.push(c);
         counts.set(r, list);
     }
@@ -19,12 +18,11 @@ function countRanks(hand) {
 // Evaluate how "good" a split is. Lower score is better (usually fewer hands).
 // We can also weight bombs higher or lower depending on strategy.
 function scoreSplit(split) {
-    var _a;
     let score = split.length * 100; // Base cost per turn
     for (const p of split) {
         if (p.type === 'FOUR')
             score -= 50; // Bombs are good
-        if (p.type === 'PAIR' && ((_a = p.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))
+        if (p.type === 'PAIR' && p.extra?.isKingBomb)
             score -= 80; // King bomb is very good
         if (p.type === 'STRAIGHT')
             score -= (p.cards.length - 3) * 5; // Long straights are efficient
@@ -78,7 +76,7 @@ function analyzeHandStructure(hand) {
         }
     }
     // Check Double Sequences (3+ pairs)
-    const pairRanks = [...counts.keys()].filter(r => { var _a, _b; return ((_b = (_a = counts.get(r)) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) >= 2 && r !== 'JOKER_BIG' && r !== 'JOKER_SMALL'; });
+    const pairRanks = [...counts.keys()].filter(r => (counts.get(r)?.length ?? 0) >= 2 && r !== 'JOKER_BIG' && r !== 'JOKER_SMALL');
     // Sort by straight order (ascending)
     pairRanks.sort((a, b) => cards_1.straightRing.indexOf(a) - cards_1.straightRing.indexOf(b));
     // Find longest run of pairs
@@ -179,15 +177,13 @@ class CardRecorder {
         }
     }
     record(cards) {
-        var _a;
         for (const c of cards) {
             const r = c.isJoker ? c.rank : c.rank;
-            this.playedCounts.set(r, ((_a = this.playedCounts.get(r)) !== null && _a !== void 0 ? _a : 0) + 1);
+            this.playedCounts.set(r, (this.playedCounts.get(r) ?? 0) + 1);
         }
     }
     getRemaining(rank) {
-        var _a, _b;
-        return ((_a = this.totalCounts.get(rank)) !== null && _a !== void 0 ? _a : 0) - ((_b = this.playedCounts.get(rank)) !== null && _b !== void 0 ? _b : 0);
+        return (this.totalCounts.get(rank) ?? 0) - (this.playedCounts.get(rank) ?? 0);
     }
     // Is a rank likely to be a bomb? (e.g. no one has played it yet)
     isBombPossible(rank) {

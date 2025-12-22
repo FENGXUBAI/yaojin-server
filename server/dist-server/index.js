@@ -332,9 +332,8 @@ function publicizeGameState(state) {
     };
 }
 function isRateLimited(socketId, minIntervalMs) {
-    var _a;
     const now = Date.now();
-    const prev = (_a = lastEventAt.get(socketId)) !== null && _a !== void 0 ? _a : 0;
+    const prev = lastEventAt.get(socketId) ?? 0;
     if (now - prev < minIntervalMs)
         return true;
     lastEventAt.set(socketId, now);
@@ -352,10 +351,9 @@ function emitSfx(r, evt) {
     io.to(r.id).emit('sfxEvent', payload);
 }
 function emitMvp(r, evt) {
-    var _a, _b;
     r.mvpSeq += 1;
     const startedAt = Date.now();
-    const gameId = (_b = (_a = r.gameState) === null || _a === void 0 ? void 0 : _a.gameId) !== null && _b !== void 0 ? _b : '';
+    const gameId = r.gameState?.gameId ?? '';
     const payload = { ...evt, startedAt, seq: r.mvpSeq, gameId };
     r.recentMvpEvents.push({ seq: r.mvpSeq, evt: payload });
     const maxKeep = 20;
@@ -365,7 +363,6 @@ function emitMvp(r, evt) {
     io.to(r.id).emit('mvpEvent', payload);
 }
 function executeBotTurn(room) {
-    var _a;
     if (!room.gameState || room.gameState.status !== 'playing')
         return;
     const state = room.gameState;
@@ -386,7 +383,7 @@ function executeBotTurn(room) {
             if (p) {
                 emitSfx(room, { kind: 'play', by: currentPlayerIdx, pattern: p });
                 // Bot Chat: React to big plays
-                if (p.type === 'FOUR' || (p.type === 'PAIR' && ((_a = p.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))) {
+                if (p.type === 'FOUR' || (p.type === 'PAIR' && p.extra?.isKingBomb)) {
                     setTimeout(() => {
                         const bots = room.players.filter(pl => pl.isBot);
                         if (bots.length > 0) {
@@ -567,15 +564,12 @@ io.on('connection', (socket) => {
             return;
         const roomList = Array.from(rooms.values())
             .filter(r => r.players.length > 0) // Only show active rooms
-            .map(r => {
-            var _a;
-            return ({
-                id: r.id,
-                playerCount: r.players.length,
-                status: r.gameState ? 'playing' : 'waiting',
-                ownerName: ((_a = r.players.find(p => p.id === r.owner)) === null || _a === void 0 ? void 0 : _a.name) || 'Unknown'
-            });
-        });
+            .map(r => ({
+            id: r.id,
+            playerCount: r.players.length,
+            status: r.gameState ? 'playing' : 'waiting',
+            ownerName: r.players.find(p => p.id === r.owner)?.name || 'Unknown'
+        }));
         socket.emit('roomList', roomList);
     });
     socket.on('chatMessage', ({ room, message }) => {
@@ -668,7 +662,7 @@ io.on('connection', (socket) => {
                 socket.emit('sfxEvent', evt);
             }
         }
-        catch (_a) { }
+        catch { }
         // Replay active MVP (if any) so refresh/reconnect resumes the room's current MVP music
         try {
             const last = typeof lastMvpSeq === 'number' ? lastMvpSeq : 0;
@@ -683,7 +677,7 @@ io.on('connection', (socket) => {
                 }
             }
         }
-        catch (_b) { }
+        catch { }
     });
     socket.on('start', ({ room }) => {
         if (isRateLimited(socket.id, 300))
@@ -727,7 +721,6 @@ io.on('connection', (socket) => {
         }
     });
     socket.on('getHints', ({ room, hintKey }) => {
-        var _a, _b, _c;
         if (isRateLimited(socket.id, 120))
             return;
         const r = rooms.get(room);
@@ -739,12 +732,12 @@ io.on('connection', (socket) => {
         const state = r.gameState;
         // Tribute return stage: suggest lowest cards to return.
         if (state.status === 'tribute_return') {
-            const pending = (_a = state.pendingReturns) === null || _a === void 0 ? void 0 : _a.find(pr => pr.actionBy === pIdx);
+            const pending = state.pendingReturns?.find(pr => pr.actionBy === pIdx);
             if (!pending) {
                 socket.emit('hints', { hintKey, options: [] });
                 return;
             }
-            const hand = (_b = state.hands[pIdx]) !== null && _b !== void 0 ? _b : [];
+            const hand = state.hands[pIdx] ?? [];
             const sorted = [...hand].sort((a, b) => {
                 if (a.isJoker !== b.isJoker)
                     return a.isJoker ? 1 : -1;
@@ -769,12 +762,11 @@ io.on('connection', (socket) => {
                 compareAgainst = null;
             }
         }
-        const hand = (_c = state.hands[pIdx]) !== null && _c !== void 0 ? _c : [];
+        const hand = state.hands[pIdx] ?? [];
         const options = (0, ai_1.getHintOptions)(hand, compareAgainst);
         socket.emit('hints', { hintKey, options });
     });
     socket.on('action', ({ room, action }) => {
-        var _a, _b;
         if (isRateLimited(socket.id, 80))
             return;
         const r = rooms.get(room);
@@ -803,7 +795,7 @@ io.on('connection', (socket) => {
                 emitSfx(r, { kind: 'pass', by: pIdx });
             }
             if (action.type === 'play') {
-                const cards = (_a = action.cards) !== null && _a !== void 0 ? _a : [];
+                const cards = action.cards ?? [];
                 const pat = (0, patterns_1.detectPattern)(cards);
                 if (pat) {
                     const hasJoker = cards.some(c => c.isJoker);
@@ -812,7 +804,7 @@ io.on('connection', (socket) => {
                         kind: 'play',
                         by: pIdx,
                         patternType: pat.type,
-                        isKingBomb: !!((_b = pat.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb),
+                        isKingBomb: !!pat.extra?.isKingBomb,
                         count: cards.length,
                         hasJoker,
                         hasA2,

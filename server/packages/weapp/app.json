@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/lobby/lobby",
+    "pages/game/game",
+    "pages/profile/profile",
+    "pages/rank/rank"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#2d5016",
+    "navigationBarTitleText": "要进",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#2d5016",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/lobby/lobby",
+        "text": "大厅"
+      },
+      {
+        "pagePath": "pages/rank/rank",
+        "text": "排行"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

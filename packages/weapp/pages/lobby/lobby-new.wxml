@@ -1,0 +1,414 @@
+<!--pages/lobby/lobby-new.wxml - 游戏大厅（美化版）-->
+<view class="lobby-container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration">
+    <view class="bg-gradient"></view>
+    <view class="bg-pattern"></view>
+    <view class="bg-glow glow-1"></view>
+    <view class="bg-glow glow-2"></view>
+  </view>
+
+  <!-- 顶部状态栏 -->
+  <view class="status-bar">
+    <!-- 用户头像区域 -->
+    <view class="user-area" bindtap="goToProfile">
+      <view class="avatar-wrapper">
+        <image class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill" wx:if="{{userInfo.avatarUrl}}"/>
+        <view class="avatar-placeholder" wx:else>
+          <text>{{userInfo.nickname[0] || '游'}}</text>
+        </view>
+        <view class="level-badge">{{userInfo.level || 1}}</view>
+        <view class="online-indicator"></view>
+      </view>
+      <view class="user-details">
+        <text class="user-name">{{userInfo.nickname || '游客玩家'}}</text>
+        <view class="exp-bar">
+          <view class="exp-fill" style="width: {{expPercent}}%"></view>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 货币显示 -->
+    <view class="currency-area">
+      <view class="currency-item coins" bindtap="goToShop">
+        <text class="currency-icon">🪙</text>
+        <text class="currency-value">{{userInfo.coins || 0}}</text>
+        <view class="add-btn">+</view>
+      </view>
+      <view class="currency-item diamonds" bindtap="goToShop">
+        <text class="currency-icon">💎</text>
+        <text class="currency-value">{{userInfo.diamonds || 0}}</text>
+        <view class="add-btn">+</view>
+      </view>
+    </view>
+    
+    <!-- 设置按钮 -->
+    <view class="settings-btn" bindtap="openSettings">
+      <text class="settings-icon">⚙️</text>
+    </view>
+  </view>
+
+  <!-- 公告横幅 -->
+  <view class="notice-banner" wx:if="{{notice}}" bindtap="showNoticeDetail">
+    <view class="notice-icon-wrap">
+      <text class="notice-icon">📢</text>
+    </view>
+    <scroll-view class="notice-scroll" scroll-x="true">
+      <text class="notice-text">{{notice}}</text>
+    </scroll-view>
+    <view class="notice-arrow">›</view>
+  </view>
+
+  <!-- 活动轮播 -->
+  <swiper class="activity-swiper" autoplay="true" interval="4000" circular="true" indicator-dots="true">
+    <swiper-item wx:for="{{activities}}" wx:key="id" bindtap="openActivity" data-id="{{item.id}}">
+      <view class="activity-card" style="background: {{item.bgColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}">
+        <image class="activity-bg" src="{{item.image}}" mode="aspectFill" wx:if="{{item.image}}"/>
+        <view class="activity-content">
+          <text class="activity-title">{{item.title}}</text>
+          <text class="activity-desc">{{item.desc}}</text>
+          <view class="activity-tag" wx:if="{{item.tag}}">{{item.tag}}</view>
+        </view>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 快捷功能栏 -->
+  <view class="quick-bar">
+    <view class="quick-item" bindtap="showSignIn">
+      <view class="quick-icon-wrap {{signedToday ? 'done' : 'pending'}}">
+        <text class="quick-icon">📅</text>
+        <view class="quick-badge" wx:if="{{!signedToday}}">!</view>
+      </view>
+      <text class="quick-label">签到</text>
+    </view>
+    <view class="quick-item" bindtap="goToTask">
+      <view class="quick-icon-wrap">
+        <text class="quick-icon">📋</text>
+        <view class="quick-badge" wx:if="{{pendingTasks > 0}}">{{pendingTasks}}</view>
+      </view>
+      <text class="quick-label">任务</text>
+    </view>
+    <view class="quick-item" bindtap="goToMail">
+      <view class="quick-icon-wrap">
+        <text class="quick-icon">📬</text>
+        <view class="quick-badge" wx:if="{{unreadMails > 0}}">{{unreadMails}}</view>
+      </view>
+      <text class="quick-label">邮件</text>
+    </view>
+    <view class="quick-item" bindtap="goToShop">
+      <view class="quick-icon-wrap">
+        <text class="quick-icon">🛒</text>
+        <view class="quick-badge hot">热</view>
+      </view>
+      <text class="quick-label">商城</text>
+    </view>
+    <view class="quick-item" bindtap="goToRank">
+      <view class="quick-icon-wrap">
+        <text class="quick-icon">🏆</text>
+      </view>
+      <text class="quick-label">排行</text>
+    </view>
+  </view>
+
+  <!-- 主游戏入口 -->
+  <view class="main-section">
+    <view class="section-header">
+      <text class="section-title">开始游戏</text>
+      <text class="section-subtitle">选择你喜欢的模式</text>
+    </view>
+    
+    <view class="game-modes">
+      <!-- 快速匹配 -->
+      <view class="mode-card mode-quick" bindtap="quickMatch">
+        <view class="mode-decoration">
+          <view class="mode-glow"></view>
+        </view>
+        <view class="mode-content">
+          <view class="mode-icon-wrap">
+            <text class="mode-icon">⚡</text>
+          </view>
+          <text class="mode-title">快速匹配</text>
+          <text class="mode-desc">自动匹配对手，快速开始</text>
+          <view class="mode-info">
+            <text class="online-count">🟢 {{onlineCount || '1,234'}}人在线</text>
+          </view>
+        </view>
+        <view class="mode-btn">
+          <text>立即开始</text>
+        </view>
+      </view>
+      
+      <!-- 好友房间 -->
+      <view class="mode-card mode-friend" bindtap="showRoomActions">
+        <view class="mode-content">
+          <view class="mode-icon-wrap">
+            <text class="mode-icon">👥</text>
+          </view>
+          <text class="mode-title">好友房间</text>
+          <text class="mode-desc">邀请好友一起玩</text>
+        </view>
+        <view class="mode-btn secondary">
+          <text>创建/加入</text>
+        </view>
+      </view>
+      
+      <!-- 单机练习 -->
+      <view class="mode-card mode-practice" bindtap="startPractice">
+        <view class="mode-content">
+          <view class="mode-icon-wrap">
+            <text class="mode-icon">🤖</text>
+          </view>
+          <text class="mode-title">单机练习</text>
+          <text class="mode-desc">与AI对战，练习技术</text>
+        </view>
+        <view class="mode-btn secondary">
+          <text>开始练习</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 比赛场入口 -->
+  <view class="tournament-section">
+    <view class="section-header">
+      <text class="section-title">🏆 比赛场</text>
+      <text class="section-more" bindtap="showAllTournaments">查看全部 ›</text>
+    </view>
+    
+    <scroll-view class="tournament-scroll" scroll-x="true">
+      <view class="tournament-list">
+        <view class="tournament-card" wx:for="{{tournaments}}" wx:key="id" bindtap="joinTournament" data-id="{{item.id}}">
+          <view class="tournament-banner" style="background: {{item.bgColor}}">
+            <text class="tournament-prize">{{item.prize}}</text>
+          </view>
+          <view class="tournament-info">
+            <text class="tournament-name">{{item.name}}</text>
+            <text class="tournament-time">{{item.startTime}}</text>
+            <view class="tournament-status {{item.status}}">
+              <text>{{item.statusText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 底部导航 -->
+  <view class="bottom-nav">
+    <view class="nav-item active">
+      <text class="nav-icon">🎮</text>
+      <text class="nav-label">大厅</text>
+    </view>
+    <view class="nav-item" bindtap="goToFriends">
+      <text class="nav-icon">👥</text>
+      <text class="nav-label">好友</text>
+      <view class="nav-badge" wx:if="{{friendRequests > 0}}">{{friendRequests}}</view>
+    </view>
+    <view class="nav-item" bindtap="goToRecord">
+      <text class="nav-icon">📊</text>
+      <text class="nav-label">战绩</text>
+    </view>
+    <view class="nav-item" bindtap="goToProfile">
+      <text class="nav-icon">👤</text>
+      <text class="nav-label">我的</text>
+    </view>
+  </view>
+
+  <!-- ========== 弹窗组件 ========== -->
+  
+  <!-- 签到弹窗 -->
+  <view class="modal-overlay {{showSignInModal ? 'show' : ''}}" bindtap="closeSignInModal">
+    <view class="modal-container sign-in-modal" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">每日签到</text>
+        <view class="modal-close" bindtap="closeSignInModal">✕</view>
+      </view>
+      <view class="modal-body">
+        <view class="sign-in-desc">
+          <text>累计签到 </text>
+          <text class="highlight">{{signInDays}}</text>
+          <text> 天</text>
+        </view>
+        
+        <view class="sign-in-grid">
+          <view class="sign-day {{item.status}}" wx:for="{{signInRewards}}" wx:key="day">
+            <text class="day-label">第{{item.day}}天</text>
+            <text class="day-reward">{{item.reward}}</text>
+            <view class="day-icon" wx:if="{{item.status === 'claimed'}}">✓</view>
+            <view class="day-icon today" wx:elif="{{item.status === 'today'}}">🎁</view>
+          </view>
+        </view>
+        
+        <view class="sign-in-btn {{signedToday ? 'disabled' : ''}}" bindtap="doSignIn">
+          <text>{{signedToday ? '今日已签到' : '立即签到'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 房间操作弹窗 -->
+  <view class="modal-overlay {{showRoomModal ? 'show' : ''}}" bindtap="closeRoomModal">
+    <view class="modal-container room-modal" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">好友房间</text>
+        <view class="modal-close" bindtap="closeRoomModal">✕</view>
+      </view>
+      <view class="modal-body">
+        <view class="room-tabs">
+          <view class="room-tab {{roomTab === 'create' ? 'active' : ''}}" bindtap="switchRoomTab" data-tab="create">
+            创建房间
+          </view>
+          <view class="room-tab {{roomTab === 'join' ? 'active' : ''}}" bindtap="switchRoomTab" data-tab="join">
+            加入房间
+          </view>
+        </view>
+        
+        <!-- 创建房间 -->
+        <view class="tab-content" wx:if="{{roomTab === 'create'}}">
+          <view class="form-group">
+            <text class="form-label">房间名称</text>
+            <input class="form-input" placeholder="给房间起个名字" value="{{newRoomName}}" bindinput="onRoomNameInput"/>
+          </view>
+          
+          <view class="form-group">
+            <text class="form-label">游戏人数</text>
+            <view class="player-select">
+              <view class="player-option {{playerCount === 3 ? 'selected' : ''}}" bindtap="setPlayerCount" data-count="3">
+                <text class="option-icon">👤👤👤</text>
+                <text class="option-label">3人局</text>
+              </view>
+              <view class="player-option {{playerCount === 4 ? 'selected' : ''}}" bindtap="setPlayerCount" data-count="4">
+                <text class="option-icon">👤👤👤👤</text>
+                <text class="option-label">4人局</text>
+              </view>
+            </view>
+          </view>
+          
+          <view class="form-group">
+            <text class="form-label">房间设置</text>
+            <view class="room-settings">
+              <view class="setting-item">
+                <text>允许旁观</text>
+                <switch checked="{{allowSpectate}}" bindchange="toggleSpectate"/>
+              </view>
+              <view class="setting-item">
+                <text>语音聊天</text>
+                <switch checked="{{enableVoice}}" bindchange="toggleVoice"/>
+              </view>
+            </view>
+          </view>
+          
+          <view class="btn-primary large" bindtap="createRoom">
+            <text>创建房间</text>
+          </view>
+        </view>
+        
+        <!-- 加入房间 -->
+        <view class="tab-content" wx:if="{{roomTab === 'join'}}">
+          <view class="form-group">
+            <text class="form-label">房间号</text>
+            <view class="room-code-input">
+              <input class="form-input code" placeholder="输入6位房间号" value="{{joinRoomId}}" bindinput="onJoinRoomInput" maxlength="6"/>
+              <view class="paste-btn" bindtap="pasteRoomCode">粘贴</view>
+            </view>
+          </view>
+          
+          <view class="btn-primary large" bindtap="joinRoom">
+            <text>加入房间</text>
+          </view>
+          
+          <view class="room-list" wx:if="{{recentRooms.length > 0}}">
+            <text class="list-title">最近加入</text>
+            <view class="room-item" wx:for="{{recentRooms}}" wx:key="id" bindtap="joinRoomById" data-id="{{item.id}}">
+              <view class="room-info">
+                <text class="room-name">{{item.name}}</text>
+                <text class="room-time">{{item.lastJoin}}</text>
+              </view>
+              <text class="room-players">{{item.players}}/{{item.maxPlayers}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 匹配中遮罩 -->
+  <view class="matching-overlay {{isMatching ? 'show' : ''}}">
+    <view class="matching-content">
+      <view class="matching-animation">
+        <view class="spinner-ring"></view>
+        <view class="spinner-center">
+          <text class="match-icon">🎮</text>
+        </view>
+      </view>
+      <text class="matching-title">正在匹配</text>
+      <text class="matching-timer">{{matchTime}}s</text>
+      <view class="matching-tips">
+        <text>{{matchTip}}</text>
+      </view>
+      <view class="btn-outline danger" bindtap="cancelMatch">
+        <text>取消匹配</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 设置弹窗 -->
+  <view class="modal-overlay {{showSettings ? 'show' : ''}}" bindtap="closeSettings">
+    <view class="modal-container settings-modal" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">设置</text>
+        <view class="modal-close" bindtap="closeSettings">✕</view>
+      </view>
+      <view class="modal-body">
+        <view class="settings-section">
+          <text class="settings-section-title">音效设置</text>
+          <view class="setting-row">
+            <text class="setting-label">游戏音效</text>
+            <switch checked="{{settings.soundEnabled}}" bindchange="toggleSound"/>
+          </view>
+          <view class="setting-row">
+            <text class="setting-label">背景音乐</text>
+            <switch checked="{{settings.musicEnabled}}" bindchange="toggleMusic"/>
+          </view>
+          <view class="setting-row">
+            <text class="setting-label">震动反馈</text>
+            <switch checked="{{settings.vibrationEnabled}}" bindchange="toggleVibration"/>
+          </view>
+        </view>
+        
+        <view class="settings-section">
+          <text class="settings-section-title">游戏设置</text>
+          <view class="setting-row">
+            <text class="setting-label">出牌确认</text>
+            <switch checked="{{settings.confirmPlay}}" bindchange="toggleConfirmPlay"/>
+          </view>
+          <view class="setting-row">
+            <text class="setting-label">自动整理手牌</text>
+            <switch checked="{{settings.autoSort}}" bindchange="toggleAutoSort"/>
+          </view>
+        </view>
+        
+        <view class="settings-section">
+          <text class="settings-section-title">其他</text>
+          <view class="setting-row clickable" bindtap="showAbout">
+            <text class="setting-label">关于游戏</text>
+            <text class="setting-arrow">›</text>
+          </view>
+          <view class="setting-row clickable" bindtap="showHelp">
+            <text class="setting-label">游戏规则</text>
+            <text class="setting-arrow">›</text>
+          </view>
+          <view class="setting-row clickable" bindtap="feedback">
+            <text class="setting-label">意见反馈</text>
+            <text class="setting-arrow">›</text>
+          </view>
+        </view>
+        
+        <view class="logout-btn" bindtap="logout">
+          <text>退出登录</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

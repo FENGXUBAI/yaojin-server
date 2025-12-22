@@ -108,11 +108,29 @@ page {
   height: 60rpx;
 }
 
+/* 头像占位符 */
+.avatar-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #4c669f 0%, #3b5998 100%);
+  color: #fff;
+}
+
+.avatar-placeholder .avatar-text {
+  font-size: 40rpx;
+  font-weight: bold;
+}
+
+.avatar-small.avatar-placeholder .avatar-text {
+  font-size: 28rpx;
+}
+
 /* 游戏桌面 */
 .game-table {
   width: 100%;
   height: 100vh;
-  background: url('/images/table_bg.jpg') center/cover;
+  background: linear-gradient(135deg, #1a472a 0%, #0d2818 100%);
   position: relative;
 }
 

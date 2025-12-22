@@ -1,66 +1,71 @@
-// pages/profile/profile.js
+// pages/profile/profile.js - 个人中心
+const app = getApp();
+
 Page({
-
-  /**
-   * 页面的初始数据
-   */
   data: {
-
+    userInfo: {},
+    winRate: '0%'
   },
 
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad(options) {
-
+  onLoad() {
+    this.loadUserInfo();
   },
 
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady() {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
   onShow() {
-
+    this.loadUserInfo();
   },
 
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide() {
-
+  loadUserInfo() {
+    const userInfo = app.globalData.userInfo || {
+      nickname: '游客',
+      avatarUrl: '',
+      coins: 10000,
+      diamonds: 0,
+      level: 1,
+      wins: 0,
+      total: 0,
+      id: ''
+    };
+    
+    const winRate = userInfo.total > 0 
+      ? Math.round(userInfo.wins / userInfo.total * 100) + '%'
+      : '0%';
+    
+    this.setData({ userInfo, winRate });
   },
 
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload() {
-
+  onGameRecord() {
+    wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh() {
-
+  onAchievements() {
+    wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom() {
-
+  onSettings() {
+    wx.showToast({ title: '功能开发中', icon: 'none' });
   },
 
-  /**
-   * 用户点击右上角分享
-   */
-  onShareAppMessage() {
+  onAbout() {
+    wx.showModal({
+      title: '关于要进',
+      content: '版本 1.0.0\n一款好玩的斗地主游戏',
+      showCancel: false
+    });
+  },
 
+  onLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '确定要退出登录吗？',
+      success: (res) => {
+        if (res.confirm) {
+          wx.clearStorageSync();
+          app.globalData.userInfo = null;
+          app.globalData.token = null;
+          wx.reLaunch({ url: '/pages/login/login' });
+        }
+      }
+    });
   }
-})
+});

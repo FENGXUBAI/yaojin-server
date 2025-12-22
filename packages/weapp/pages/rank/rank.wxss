@@ -1,0 +1,164 @@
+/* pages/rank/rank.wxss */
+
+.rank-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a472a 0%, #0d2818 100%);
+  padding: 20rpx;
+}
+
+/* 排行榜头部 */
+.rank-header {
+  display: flex;
+  justify-content: center;
+  gap: 20rpx;
+  margin-bottom: 30rpx;
+}
+
+.rank-tab {
+  padding: 16rpx 40rpx;
+  border-radius: 30rpx;
+  font-size: 28rpx;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rank-tab.active {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #333;
+  font-weight: bold;
+}
+
+/* 前三名 */
+.top-three {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin-bottom: 40rpx;
+}
+
+.top-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 20rpx;
+}
+
+.top-item.first {
+  order: 2;
+}
+
+.top-item.second {
+  order: 1;
+}
+
+.top-item.third {
+  order: 3;
+}
+
+.crown {
+  font-size: 48rpx;
+  margin-bottom: 10rpx;
+}
+
+.top-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  border: 4rpx solid #FFD700;
+}
+
+.top-item.first .top-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-color: #FFD700;
+}
+
+.top-item.second .top-avatar {
+  border-color: #C0C0C0;
+}
+
+.top-item.third .top-avatar {
+  border-color: #CD7F32;
+}
+
+.top-name {
+  font-size: 26rpx;
+  color: #fff;
+  margin-top: 12rpx;
+}
+
+.top-score {
+  font-size: 24rpx;
+  color: #FFD700;
+  margin-top: 6rpx;
+}
+
+/* 排行列表 */
+.rank-list {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.rank-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 20rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.rank-item:last-child {
+  border-bottom: none;
+}
+
+.rank-num {
+  width: 60rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #FFD700;
+  text-align: center;
+}
+
+.rank-avatar {
+  width: 70rpx;
+  height: 70rpx;
+  border-radius: 50%;
+  margin: 0 20rpx;
+}
+
+.rank-info {
+  flex: 1;
+}
+
+.rank-name {
+  font-size: 30rpx;
+  color: #fff;
+}
+
+.rank-win-rate {
+  font-size: 24rpx;
+  color: #ccc;
+  margin-top: 6rpx;
+}
+
+.rank-score {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #FFD700;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 100rpx 40rpx;
+}
+
+.empty-icon {
+  font-size: 100rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #ccc;
+  margin-top: 20rpx;
+}

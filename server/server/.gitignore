@@ -1,0 +1,21 @@
+# 依赖目录
+node_modules/
+
+# 环境变量
+.env
+.env.local
+
+# 日志
+*.log
+npm-debug.log*
+
+# 编辑器
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# TypeScript 编译输出 (保留 dist-server 用于部署)
+# dist-server/

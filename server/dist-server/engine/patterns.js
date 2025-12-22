@@ -13,10 +13,9 @@ function allSameRank(cards) {
     return r0;
 }
 function countByRank(cards) {
-    var _a;
     const m = new Map();
     for (const c of cards) {
-        const a = (_a = m.get(c.rank)) !== null && _a !== void 0 ? _a : [];
+        const a = m.get(c.rank) ?? [];
         a.push(c);
         m.set(c.rank, a);
     }
@@ -136,7 +135,6 @@ function detectPattern(cards) {
     return null;
 }
 function canBeat(previous, next) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
     // 逻辑五~九
     if (previous.type === 'SINGLE') {
         if (next.type === 'SINGLE')
@@ -144,31 +142,31 @@ function canBeat(previous, next) {
         if (next.type === 'TRIPLE' || next.type === 'FOUR')
             return true; // 炸/轰大于单
         // 王炸（二王）作为PAIR在识别中，但出牌阶段应视为轰
-        if (next.type === 'PAIR' && ((_a = next.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
             return true;
         return false;
     }
     if (previous.type === 'PAIR') {
-        if (next.type === 'PAIR' && !((_b = next.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb))
+        if (next.type === 'PAIR' && !next.extra?.isKingBomb)
             return next.strength > previous.strength;
         if (next.type === 'TRIPLE' || next.type === 'FOUR')
             return true;
-        if (next.type === 'PAIR' && ((_c = next.extra) === null || _c === void 0 ? void 0 : _c.isKingBomb))
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
             return true; // 王炸
         return false;
     }
     if (previous.type === 'STRAIGHT') {
-        if (next.type === 'STRAIGHT' && (((_d = next.extra) === null || _d === void 0 ? void 0 : _d.straightLength) === ((_e = previous.extra) === null || _e === void 0 ? void 0 : _e.straightLength))) {
+        if (next.type === 'STRAIGHT' && (next.extra?.straightLength === previous.extra?.straightLength)) {
             return next.strength > previous.strength;
         }
-        if (next.type === 'TRIPLE' || next.type === 'FOUR' || (next.type === 'PAIR' && ((_f = next.extra) === null || _f === void 0 ? void 0 : _f.isKingBomb)))
+        if (next.type === 'TRIPLE' || next.type === 'FOUR' || (next.type === 'PAIR' && next.extra?.isKingBomb))
             return true;
         return false;
     }
     if (previous.type === 'TRIPLE') {
         if (next.type === 'TRIPLE')
             return next.strength > previous.strength;
-        if (next.type === 'FOUR' || (next.type === 'PAIR' && ((_g = next.extra) === null || _g === void 0 ? void 0 : _g.isKingBomb)))
+        if (next.type === 'FOUR' || (next.type === 'PAIR' && next.extra?.isKingBomb))
             return true;
         return false;
     }
@@ -176,7 +174,7 @@ function canBeat(previous, next) {
         // 轰只能被更大的轰或王轰（两王）压制
         if (next.type === 'FOUR')
             return next.strength > previous.strength;
-        if (next.type === 'PAIR' && ((_h = next.extra) === null || _h === void 0 ? void 0 : _h.isKingBomb))
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
             return true;
         return false;
     }

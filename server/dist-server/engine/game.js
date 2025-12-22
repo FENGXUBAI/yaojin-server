@@ -37,8 +37,7 @@ function findSpade4Owner(hands) {
     return 0;
 }
 function initGame(opts) {
-    var _a;
-    const deck = (_a = opts.deck) !== null && _a !== void 0 ? _a : (0, cards_1.createDeck)();
+    const deck = opts.deck ?? (0, cards_1.createDeck)();
     const gameId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let hands = dealHands(deck, opts.playerCount);
     let firstPlayer = 0;
@@ -131,7 +130,6 @@ function isThreeFours(cards) {
     return cards.every(c => !c.isJoker && c.rank === '4');
 }
 function playTurn(state, action) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     // Intentionally no console spam here; server already logs key lifecycle events.
     if (state.finishedOrder.includes(state.currentPlayer)) {
         // skip finished automatically
@@ -177,8 +175,8 @@ function playTurn(state, action) {
         // if everyone except lastPlayOwner has passed and we return to owner
         // we DO NOT clear tablePlays here anymore, as requested.
         // Only clear when game ends or new game starts.
-        let tablePlays = (_a = state.tablePlays) !== null && _a !== void 0 ? _a : [];
-        let currentTrickPlays = (_b = state.currentTrickPlays) !== null && _b !== void 0 ? _b : [];
+        let tablePlays = state.tablePlays ?? [];
+        let currentTrickPlays = state.currentTrickPlays ?? [];
         if (state.lastPlay && next === state.lastPlay.by && passesInRow >= activePlayersCount(state) - 1) {
             // Trick ends: clear lastPlay so the owner leads freely next.
             // Keep tablePlays history for UI/record.
@@ -220,7 +218,7 @@ function playTurn(state, action) {
         }
         // 起轰：三张4可以起轰（包括王轰）
         const isHong = effectiveLastPlay.type === 'FOUR';
-        const isKingBomb = effectiveLastPlay.type === 'PAIR' && ((_c = effectiveLastPlay.extra) === null || _c === void 0 ? void 0 : _c.isKingBomb);
+        const isKingBomb = effectiveLastPlay.type === 'PAIR' && effectiveLastPlay.extra?.isKingBomb;
         if ((isHong || isKingBomb) && isThreeFours(action.cards)) {
             // 三张4可以起轰
             capturedCards = effectiveLastPlay.cards;
@@ -234,7 +232,7 @@ function playTurn(state, action) {
             // We need to find the TablePlay that corresponds to effectiveLastPlay
             // effectiveLastPlay has 'by' and 'cards'.
             // We look for a TablePlay with same 'by' and same cards.
-            const newTablePlays = ((_d = state.tablePlays) !== null && _d !== void 0 ? _d : []).filter(tp => {
+            const newTablePlays = (state.tablePlays ?? []).filter(tp => {
                 if (tp.by !== effectiveLastPlay.by)
                     return true;
                 // Check if cards match
@@ -249,7 +247,7 @@ function playTurn(state, action) {
             newTablePlays.push({ by: state.currentPlayer, cards: action.cards });
             // Update currentTrickPlays for Capture
             // Remove captured cards from currentTrickPlays
-            const newCurrentTrickPlays = ((_e = state.currentTrickPlays) !== null && _e !== void 0 ? _e : []).filter(tp => {
+            const newCurrentTrickPlays = (state.currentTrickPlays ?? []).filter(tp => {
                 if (tp.by !== effectiveLastPlay.by)
                     return true;
                 if (tp.cards.length !== capturedCards.length)
@@ -300,7 +298,7 @@ function playTurn(state, action) {
     }
     if (compareAgainst) {
         // 王炸识别为PAIR，但对比视作轰
-        const normalizedNext = (pattern.type === 'PAIR' && ((_f = pattern.extra) === null || _f === void 0 ? void 0 : _f.isKingBomb))
+        const normalizedNext = (pattern.type === 'PAIR' && pattern.extra?.isKingBomb)
             ? { ...pattern, type: 'FOUR', strength: Number.MAX_SAFE_INTEGER }
             : pattern;
         if (!(0, patterns_1.canBeat)(compareAgainst, normalizedNext)) {
@@ -323,8 +321,8 @@ function playTurn(state, action) {
             finishedOrder = [...finishedOrder, remaining];
         }
     }
-    const newTablePlays = [...((_g = state.tablePlays) !== null && _g !== void 0 ? _g : []), { by: state.currentPlayer, cards: action.cards }];
-    let newCurrentTrickPlays = isNewTrick ? [] : [...((_h = state.currentTrickPlays) !== null && _h !== void 0 ? _h : [])];
+    const newTablePlays = [...(state.tablePlays ?? []), { by: state.currentPlayer, cards: action.cards }];
+    let newCurrentTrickPlays = isNewTrick ? [] : [...(state.currentTrickPlays ?? [])];
     newCurrentTrickPlays.push({ by: state.currentPlayer, cards: action.cards });
     // Clear table plays only when game is over
     let finalTablePlays = newTablePlays;
@@ -343,7 +341,7 @@ function playTurn(state, action) {
     if (pattern.type === 'FOUR') {
         newMultiplier *= 2; // Bomb x2
     }
-    else if (pattern.type === 'PAIR' && ((_j = pattern.extra) === null || _j === void 0 ? void 0 : _j.isKingBomb)) {
+    else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
         newMultiplier *= 4; // King Bomb x4
     }
     // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
@@ -550,7 +548,6 @@ function resolveReturnTribute(state, playerId, cards) {
     };
 }
 function hasValidMove(hand, lastPlay) {
-    var _a, _b, _c, _d, _e;
     if (!lastPlay)
         return hand.length > 0; // Free turn, any card is valid (if hand not empty)
     // Check for Bomb (Four) or King Bomb - they can beat almost anything
@@ -574,7 +571,7 @@ function hasValidMove(hand, lastPlay) {
                 return true;
         }
         // Triple 4s can capture Bomb (Four) or King Bomb
-        if (lastPlay.type === 'FOUR' || (lastPlay.type === 'PAIR' && ((_a = lastPlay.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))) {
+        if (lastPlay.type === 'FOUR' || (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb)) {
             const fours = counts.get('4') || 0;
             if (fours >= 3)
                 return true;
@@ -589,7 +586,7 @@ function hasValidMove(hand, lastPlay) {
                 if (bombStrength > lastPlay.strength)
                     return true;
             }
-            else if (lastPlay.type === 'PAIR' && ((_b = lastPlay.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb)) {
+            else if (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb) {
                 // Bomb cannot beat King Bomb
             }
             else {
@@ -598,7 +595,7 @@ function hasValidMove(hand, lastPlay) {
         }
     }
     // If lastPlay is King Bomb, nothing can beat it (except maybe special rules? No, King Bomb is max).
-    if (lastPlay.type === 'PAIR' && ((_c = lastPlay.extra) === null || _c === void 0 ? void 0 : _c.isKingBomb))
+    if (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb)
         return false;
     // Check same type
     if (lastPlay.type === 'SINGLE') {
@@ -626,7 +623,7 @@ function hasValidMove(hand, lastPlay) {
         }
     }
     // STRAIGHT / DOUBLE_SEQUENCE: check if we can form a same-length sequence with higher strength.
-    if (lastPlay.type === 'STRAIGHT' && ((_d = lastPlay.extra) === null || _d === void 0 ? void 0 : _d.straightLength)) {
+    if (lastPlay.type === 'STRAIGHT' && lastPlay.extra?.straightLength) {
         const len = lastPlay.extra.straightLength;
         const normalUniqueRanks = Array.from(counts.keys());
         const runs = (0, cards_1.findStraightRuns)(normalUniqueRanks);
@@ -642,7 +639,7 @@ function hasValidMove(hand, lastPlay) {
         }
         return false;
     }
-    if (lastPlay.type === 'DOUBLE_SEQUENCE' && ((_e = lastPlay.extra) === null || _e === void 0 ? void 0 : _e.straightLength)) {
+    if (lastPlay.type === 'DOUBLE_SEQUENCE' && lastPlay.extra?.straightLength) {
         const pairLen = lastPlay.extra.straightLength;
         // Reuse outer counts map
         const pairRanks = Array.from(counts.entries())

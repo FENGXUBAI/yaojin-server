@@ -1,17 +1,25 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "module": "commonjs",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "lib": ["ES2020"],
     "outDir": "./dist-server",
-    "rootDir": "./",
-    "strict": false,
+    "rootDir": ".",
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": false,
-    "noEmit": false
+    "moduleResolution": "node"
   },
-  "include": ["*.ts", "engine/**/*.ts"],
-  "exclude": ["node_modules", "dist-server", "index-v2.ts", "auth.ts", "database.ts", "matchmaker.ts"]
+  "include": [
+    "index.ts",
+    "engine/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-server"
+  ]
 }

@@ -1,0 +1,35 @@
+<!--pages/login/login.wxml-->
+<view class="container">
+  <view class="logo-section">
+    <view class="logo-placeholder">
+      <text class="logo-text">要</text>
+    </view>
+    <text class="title">要进</text>
+  </view>
+
+  <view class="login-section">
+    <!-- 微信一键登录 -->
+    <button class="login-btn wechat" open-type="getUserProfile" bindtap="onWechatLogin">
+      <text class="btn-icon-text">微信</text>
+      <text>微信登录</text>
+    </button>
+
+    <!-- 游客登录 -->
+    <button class="login-btn guest" bindtap="onGuestLogin">
+      <text class="btn-icon-text">👤</text>
+      <text>游客登录</text>
+    </button>
+  </view>
+
+  <view class="footer">
+    <view class="agreement">
+      <checkbox checked="{{agreed}}" bindtap="onToggleAgreement" />
+      <text class="agreement-text">
+        我已阅读并同意
+        <text class="link" bindtap="onUserAgreement">《用户协议》</text>
+        和
+        <text class="link" bindtap="onPrivacyPolicy">《隐私政策》</text>
+      </text>
+    </view>
+  </view>
+</view>

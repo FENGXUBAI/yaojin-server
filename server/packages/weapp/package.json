@@ -1,0 +1,13 @@
+{
+  "name": "yaojin-weapp",
+  "version": "1.0.0",
+  "description": "耀金斗地主微信小程序",
+  "main": "app.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "miniprogram-api-typings": "^3.12.0"
+  }
+}

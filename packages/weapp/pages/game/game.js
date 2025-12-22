@@ -1,28 +1,84 @@
 /**
- * 游戏页面逻辑
+ * 游戏页面逻辑 - 单机版本（与机器人对战）
+ * 美化版 - 包含音效和动画效果
  */
 const app = getApp();
 
-// 导入游戏核心模块 (编译后从 game-core 复制过来)
-const { detectPattern, canBeat, getHintOptions } = require('../../utils/game-core.js');
+// 导入游戏核心模块
+const { detectPattern, canBeat, getHintOptions, getCardValue } = require('../../utils/game-core.js');
+
+// 导入音效模块
+const sound = require('../../utils/sound.js');
+
+// 生成一副牌
+function generateDeck() {
+  const suits = ['♠', '♥', '♦', '♣'];
+  const ranks = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+  const deck = [];
+  
+  for (const suit of suits) {
+    for (const rank of ranks) {
+      deck.push({ suit, rank, id: `${suit}${rank}` });
+    }
+  }
+  deck.push({ suit: '', rank: 'joker', id: 'joker' });
+  deck.push({ suit: '', rank: 'JOKER', id: 'JOKER' });
+  
+  // 洗牌
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  
+  return deck;
+}
+
+// 发牌
+function dealCards(deck) {
+  const hands = [[], [], []];
+  const landlordCards = [];
+  
+  for (let i = 0; i < 51; i++) {
+    hands[i % 3].push(deck[i]);
+  }
+  for (let i = 51; i < 54; i++) {
+    landlordCards.push(deck[i]);
+  }
+  
+  // 排序
+  for (const hand of hands) {
+    hand.sort((a, b) => getCardValue(b) - getCardValue(a));
+  }
+  
+  return { hands, landlordCards };
+}
 
 Page({
   data: {
     // 房间信息
     roomId: '',
-    isOwner: false,
     multiplier: 1,
+    isOwner: true,
     
     // 玩家信息
-    myInfo: {},
-    myIndex: -1,
-    opponents: [],
+    myIndex: 0,
+    landlordIndex: 0,
+    myInfo: {
+      name: '我',
+      coins: 1000,
+      avatar: ''
+    },
+    opponents: [
+      { name: '机器人A', cardCount: 17, isLandlord: false },
+      { name: '机器人B', cardCount: 17, isLandlord: false }
+    ],
     
     // 游戏状态
-    isMyTurn: false,
+    isMyTurn: true,
+    currentPlayer: 0,
+    status: 'playing',
     timeLeft: 30,
     cannotPlay: false,
-    passCountdown: 0,
     autoPlay: false,
     
     // 手牌
@@ -32,6 +88,8 @@ Page({
     // 场上的牌
     centerCards: [],
     playLabel: '',
+    lastPlayIndex: -1,
+    lastPattern: null,
     
     // 特效
     showBombEffect: false,
@@ -39,351 +97,409 @@ Page({
     
     // 聊天
     showChat: false,
-    chatMessages: [],
     chatInput: '',
-    lastMsgId: '',
-    emojis: ['😀', '😂', '😭', '😡', '👍', '👎', '💣', '🤝'],
-    quickPhrases: ['快点啊', '打得好', '你是猪吗', '合作愉快', '谢谢老板'],
+    chatMessages: [],
+    emojis: ['😊', '😂', '🤔', '😎', '👍', '👎', '💪', '🎉'],
+    quickPhrases: ['快点啊', '不要走', '厉害', '打得好'],
     
     // 游戏结束
     showGameOver: false,
+    isWin: false,
     finalScores: []
   },
 
   onLoad(options) {
-    const roomId = options.roomId || '';
+    const roomId = options.roomId || 'LOCAL';
     this.setData({ roomId });
     
-    // 连接服务器
-    this.connectGame();
+    // 开始本地游戏
+    this.startLocalGame();
   },
 
-  onUnload() {
-    // 断开连接
-    if (this.socketListener) {
-      // 移除监听
-    }
-  },
-
-  // 连接游戏服务器
-  connectGame() {
-    const socket = app.connectSocket();
+  // 开始本地游戏
+  startLocalGame() {
+    const deck = generateDeck();
+    const { hands, landlordCards } = dealCards(deck);
     
-    socket.onMessage((res) => {
-      try {
-        const { event, data } = JSON.parse(res.data);
-        this.handleSocketEvent(event, data);
-      } catch (e) {
-        console.error('消息解析失败:', e);
-      }
-    });
-
-    // 加入房间
-    setTimeout(() => {
-      app.sendMessage('joinRoom', {
-        room: this.data.roomId,
-        name: app.globalData.userInfo?.nickname || '游客',
-        avatar: app.globalData.userInfo?.avatarUrl
-      });
-    }, 500);
-  },
-
-  // 处理服务器事件
-  handleSocketEvent(event, data) {
-    switch (event) {
-      case 'roomState':
-        this.handleRoomState(data);
-        break;
-      case 'gameStart':
-        this.handleGameStart(data);
-        break;
-      case 'gameState':
-        this.handleGameState(data);
-        break;
-      case 'privateState':
-        this.handlePrivateState(data);
-        break;
-      case 'gameOver':
-        this.handleGameOver(data);
-        break;
-      case 'sfxEvent':
-        this.handleSfxEvent(data);
-        break;
-      case 'chatMessage':
-        this.handleChatMessage(data);
-        break;
-      case 'timer':
-        this.handleTimer(data);
-        break;
-      case 'error':
-        wx.showToast({ title: data, icon: 'none' });
-        break;
-    }
-  },
-
-  // 处理房间状态
-  handleRoomState(data) {
-    const { players, owner } = data;
-    const myId = app.globalData.userInfo?.id;
+    // 玩家是地主
+    const myCards = [...hands[0], ...landlordCards].sort((a, b) => getCardValue(b) - getCardValue(a));
     
-    const myIndex = players.findIndex(p => p.id === myId);
-    const opponents = [];
-    
-    for (let i = 1; i < players.length; i++) {
-      const idx = (myIndex + i) % players.length;
-      opponents.push({
-        ...players[idx],
-        cardCount: data.handCounts?.[idx] || 0
-      });
-    }
+    this.gameData = {
+      hands: [myCards, hands[1], hands[2]],
+      currentPlayer: 0,
+      lastPlay: null,
+      lastPlayIndex: -1
+    };
     
     this.setData({
-      myIndex,
-      myInfo: players[myIndex] || {},
-      opponents,
-      isOwner: owner === myId
-    });
-  },
-
-  // 游戏开始
-  handleGameStart(state) {
-    this.setData({
-      showGameOver: false,
-      multiplier: state.multiplier || 1,
-      centerCards: [],
-      playLabel: ''
+      myCards: myCards.map((c, i) => ({ ...c, index: i })),
+      landlordIndex: 0,
+      isMyTurn: true,
+      opponents: [
+        { name: '机器人A', cardCount: 17, isLandlord: false },
+        { name: '机器人B', cardCount: 17, isLandlord: false }
+      ]
     });
     
-    // 播放开始音效
-    app.playSFX('/sounds/start.mp3');
+    wx.showToast({ title: '你是地主！', icon: 'none', duration: 1500 });
   },
 
-  // 更新游戏状态
-  handleGameState(state) {
-    const isMyTurn = state.currentPlayer === this.data.myIndex && state.status === 'playing';
-    
-    // 更新中央出牌区
-    let centerCards = [];
-    let playLabel = '';
-    
-    if (state.lastPlay) {
-      centerCards = this.formatCards(state.lastPlay.cards || []);
-      playLabel = state.lastPlay.label || '';
-    }
-    
-    // 更新对手牌数
-    const opponents = this.data.opponents.map((opp, i) => {
-      const realIndex = (this.data.myIndex + i + 1) % state.playerCount;
-      return {
-        ...opp,
-        cardCount: state.handCounts?.[realIndex] || 0
-      };
-    });
-    
-    this.setData({
-      isMyTurn,
-      opponents,
-      centerCards,
-      playLabel,
-      multiplier: state.multiplier || 1
-    });
-
-    // 轮到自己时震动提示
-    if (isMyTurn) {
-      wx.vibrateShort({ type: 'medium' });
-    }
-  },
-
-  // 处理私有状态（手牌）
-  handlePrivateState(data) {
-    const myCards = this.formatCards(data.hand || []);
-    this.setData({ myCards, selectedCards: {} });
-  },
-
-  // 格式化卡牌用于显示
-  formatCards(cards) {
-    return cards.map(c => ({
-      ...c,
-      displayRank: c.isJoker ? (c.rank === 'JOKER_BIG' ? '大王' : '小王') : c.rank,
-      isRed: c.suit === '♥' || c.suit === '♦'
-    }));
-  },
-
-  // 处理计时器
-  handleTimer(data) {
-    this.setData({ timeLeft: data.remaining || 30 });
-  },
-
-  // 选择/取消选择卡牌
-  toggleCard(e) {
+  // 选中牌
+  onSelectCard(e) {
     const index = e.currentTarget.dataset.index;
-    const selectedCards = { ...this.data.selectedCards };
+    const selected = { ...this.data.selectedCards };
     
-    if (selectedCards[index]) {
-      delete selectedCards[index];
+    if (selected[index]) {
+      delete selected[index];
     } else {
-      selectedCards[index] = true;
+      selected[index] = true;
     }
     
-    this.setData({ selectedCards });
-    app.playSFX('/sounds/select.mp3');
+    // 播放选牌音效
+    sound.play('select');
+    
+    this.setData({ selectedCards: selected });
+  },
+
+  // 获取选中的牌
+  getSelectedCards() {
+    const indices = Object.keys(this.data.selectedCards).map(Number);
+    return indices.map(i => this.data.myCards[i]).filter(Boolean);
   },
 
   // 出牌
-  handlePlay() {
-    const selectedIndices = Object.keys(this.data.selectedCards).map(Number);
-    if (selectedIndices.length === 0) {
+  onPlayCards() {
+    if (!this.data.isMyTurn) {
+      wx.showToast({ title: '还没轮到你', icon: 'none' });
+      return;
+    }
+    
+    const selectedCards = this.getSelectedCards();
+    if (selectedCards.length === 0) {
       wx.showToast({ title: '请选择要出的牌', icon: 'none' });
       return;
     }
     
-    const cards = selectedIndices.map(i => this.data.myCards[i]);
-    
-    app.sendMessage('action', {
-      room: this.data.roomId,
-      action: { type: 'play', cards }
-    });
-    
-    this.setData({ selectedCards: {} });
-  },
-
-  // 不要/过
-  handlePass() {
-    if (this.data.cannotPlay && this.data.passCountdown > 0) {
-      return; // 还在倒计时
+    const pattern = detectPattern(selectedCards);
+    if (pattern.type === 'invalid') {
+      wx.showToast({ title: '无效的牌型', icon: 'none' });
+      return;
     }
     
-    app.sendMessage('action', {
-      room: this.data.roomId,
-      action: { type: 'pass' }
+    // 检查是否能压过上家
+    if (this.data.lastPattern && this.data.lastPlayIndex !== 0) {
+      if (!canBeat(pattern, this.data.lastPattern)) {
+        wx.showToast({ title: '压不过上家的牌', icon: 'none' });
+        return;
+      }
+    }
+    
+    // 移除已出的牌
+    const indices = Object.keys(this.data.selectedCards).map(Number).sort((a, b) => b - a);
+    const newCards = [...this.data.myCards];
+    for (const i of indices) {
+      newCards.splice(i, 1);
+    }
+    
+    // 更新显示
+    this.setData({
+      myCards: newCards.map((c, i) => ({ ...c, index: i })),
+      selectedCards: {},
+      centerCards: selectedCards,
+      playLabel: this.getPatternLabel(pattern),
+      isMyTurn: false,
+      lastPattern: pattern,
+      lastPlayIndex: 0
     });
     
-    app.playSFX('/sounds/pass.mp3');
+    // 播放出牌音效
+    sound.playCard(pattern.type);
+    
+    // 更新游戏数据
+    this.gameData.hands[0] = newCards;
+    this.gameData.lastPlay = { cards: selectedCards, pattern };
+    this.gameData.lastPlayIndex = 0;
+    
+    // 炸弹特效
+    if (pattern.isBomb) {
+      this.showBombAnim(pattern.type === 'rocket' ? '王炸！' : '炸弹！');
+    }
+    
+    // 检查胜负
+    if (newCards.length === 0) {
+      this.endGame(true);
+      return;
+    }
+    
+    // 机器人出牌
+    setTimeout(() => this.botPlay(1), 1000);
+  },
+
+  // 不出
+  onPass() {
+    if (!this.data.isMyTurn) return;
+    
+    // 自己出的牌不能不要
+    if (this.data.lastPlayIndex === 0 || this.data.lastPlayIndex === -1) {
+      wx.showToast({ title: '你必须出牌', icon: 'none' });
+      return;
+    }
+    
+    // 播放过牌音效
+    sound.play('pass');
+    
+    this.setData({
+      isMyTurn: false,
+      selectedCards: {}
+    });
+    
+    // 机器人出牌
+    setTimeout(() => this.botPlay(1), 800);
   },
 
   // 提示
-  handleHint() {
-    app.sendMessage('getHints', {
-      room: this.data.roomId
-    });
-  },
-
-  // 切换托管
-  toggleAutoPlay() {
-    this.setData({ autoPlay: !this.data.autoPlay });
-  },
-
-  // 处理音效事件
-  handleSfxEvent(evt) {
-    const { kind, patternType, isKingBomb } = evt;
+  onHint() {
+    if (!this.data.isMyTurn) return;
     
-    if (kind === 'play') {
-      if (isKingBomb) {
-        this.showBomb('王炸!', '毁天灭地');
-        app.playSFX('/sounds/king_bomb.mp3');
-      } else if (patternType === 'FOUR') {
-        this.showBomb('炸弹!');
-        app.playSFX('/sounds/bomb.mp3');
-      } else {
-        app.playSFX('/sounds/play.mp3');
+    const hints = getHintOptions(this.data.myCards, this.data.lastPlayIndex === 0 ? null : this.data.lastPattern);
+    
+    if (hints.length === 0) {
+      wx.showToast({ title: '没有能出的牌', icon: 'none' });
+      return;
+    }
+    
+    // 选中提示的牌
+    const hint = hints[0];
+    const selected = {};
+    for (const card of hint) {
+      const idx = this.data.myCards.findIndex(c => c.id === card.id);
+      if (idx >= 0) selected[idx] = true;
+    }
+    
+    this.setData({ selectedCards: selected });
+  },
+
+  // 机器人出牌
+  botPlay(botIndex) {
+    const hand = this.gameData.hands[botIndex];
+    
+    // 检查是否需要跟牌
+    const needToBeat = this.gameData.lastPlayIndex !== -1 && this.gameData.lastPlayIndex !== botIndex;
+    
+    let cardsToPlay = null;
+    let pattern = null;
+    
+    if (needToBeat) {
+      // 尝试找能压过的牌
+      const hints = getHintOptions(hand, this.gameData.lastPlay?.pattern);
+      if (hints.length > 0) {
+        cardsToPlay = hints[0];
+        pattern = detectPattern(cardsToPlay);
       }
-    } else if (kind === 'pass') {
-      app.playSFX('/sounds/pass.mp3');
+    } else {
+      // 自由出牌，出最小的单张
+      if (hand.length > 0) {
+        const sorted = [...hand].sort((a, b) => getCardValue(a) - getCardValue(b));
+        cardsToPlay = [sorted[0]];
+        pattern = detectPattern(cardsToPlay);
+      }
+    }
+    
+    // 更新对手牌数
+    const opponents = [...this.data.opponents];
+    
+    if (cardsToPlay) {
+      // 移除已出的牌
+      for (const card of cardsToPlay) {
+        const idx = hand.findIndex(c => c.id === card.id);
+        if (idx >= 0) hand.splice(idx, 1);
+      }
+      
+      opponents[botIndex - 1].cardCount = hand.length;
+      
+      this.gameData.lastPlay = { cards: cardsToPlay, pattern };
+      this.gameData.lastPlayIndex = botIndex;
+      
+      this.setData({
+        opponents,
+        centerCards: cardsToPlay,
+        playLabel: `机器人${botIndex === 1 ? 'A' : 'B'}: ${this.getPatternLabel(pattern)}`,
+        lastPattern: pattern,
+        lastPlayIndex: botIndex
+      });
+      
+      // 炸弹特效
+      if (pattern.isBomb) {
+        this.showBombAnim(pattern.type === 'rocket' ? '王炸！' : '炸弹！');
+      }
+      
+      // 检查机器人是否获胜
+      if (hand.length === 0) {
+        this.endGame(false);
+        return;
+      }
+    } else {
+      // 不出
+      this.setData({
+        centerCards: [],
+        playLabel: `机器人${botIndex === 1 ? 'A' : 'B'}: 不出`
+      });
+    }
+    
+    // 下一个玩家
+    const nextPlayer = (botIndex + 1) % 3;
+    
+    if (nextPlayer === 0) {
+      // 轮到玩家
+      this.setData({ isMyTurn: true });
+      sound.play('my_turn');
+      wx.vibrateShort({ type: 'medium' });
+    } else {
+      // 下一个机器人
+      setTimeout(() => this.botPlay(nextPlayer), 1000);
     }
   },
 
-  // 显示炸弹特效
-  showBomb(text, subText = '') {
-    this.setData({
-      showBombEffect: true,
-      bombText: text + (subText ? '\n' + subText : '')
-    });
-    
+  // 获取牌型名称
+  getPatternLabel(pattern) {
+    const labels = {
+      single: '单张',
+      pair: '对子',
+      triple: '三张',
+      triple_one: '三带一',
+      triple_pair: '三带二',
+      straight: '顺子',
+      double_straight: '连对',
+      triple_straight: '飞机',
+      bomb: '炸弹',
+      rocket: '王炸'
+    };
+    return labels[pattern.type] || '';
+  },
+
+  // 炸弹特效
+  showBombAnim(text) {
+    this.setData({ showBombEffect: true, bombText: text });
+    // 音效在playCard中已播放
     wx.vibrateShort({ type: 'heavy' });
-    
     setTimeout(() => {
       this.setData({ showBombEffect: false });
-    }, 2000);
+    }, 1500);
   },
 
   // 游戏结束
-  handleGameOver(data) {
+  endGame(isWin) {
+    // 播放胜利/失败音效
+    sound.play(isWin ? 'win' : 'lose');
+    
     this.setData({
       showGameOver: true,
-      finalScores: data.scores || []
+      isWin,
+      finalScores: [
+        { name: '你', score: isWin ? 100 : -50 },
+        { name: '机器人A', score: isWin ? -50 : 50 },
+        { name: '机器人B', score: isWin ? -50 : 50 }
+      ]
     });
-    
-    wx.vibrateLong();
-    app.playSFX('/sounds/game_over.mp3');
+  },
+
+  // 重新开始
+  onRestart() {
+    this.setData({
+      showGameOver: false,
+      selectedCards: {},
+      centerCards: [],
+      playLabel: '',
+      lastPattern: null,
+      lastPlayIndex: -1
+    });
+    this.startLocalGame();
+  },
+
+  // 返回大厅
+  onBackToLobby() {
+    wx.navigateBack();
+  },
+
+  // ========== WXML 事件绑定别名 ==========
+  // 出牌按钮
+  handlePlay() {
+    this.onPlayCards();
+  },
+
+  // 不要按钮
+  handlePass() {
+    this.onPass();
+  },
+
+  // 提示按钮
+  handleHint() {
+    this.onHint();
+  },
+
+  // 选中/取消选中卡牌
+  toggleCard(e) {
+    this.onSelectCard(e);
   },
 
   // 再来一局
   playAgain() {
-    app.sendMessage('start', { room: this.data.roomId });
+    this.onRestart();
   },
 
   // 返回大厅
   backToLobby() {
-    wx.navigateBack();
+    this.onBackToLobby();
   },
 
-  // 切换聊天面板
+  // 切换托管
+  toggleAutoPlay() {
+    const autoPlay = !this.data.autoPlay;
+    this.setData({ autoPlay });
+    wx.showToast({ title: autoPlay ? '已开启托管' : '已取消托管', icon: 'none' });
+    if (autoPlay && this.data.isMyTurn) {
+      this.autoPlayCard();
+    }
+  },
+
+  // 自动出牌
+  autoPlayCard() {
+    const hints = getHintOptions(this.data.myCards, this.data.lastPattern);
+    if (hints.length > 0) {
+      // 选中提示的牌并出牌
+      const selected = {};
+      hints[0].forEach((_, i) => { selected[i] = true; });
+      this.setData({ selectedCards: selected });
+      setTimeout(() => this.onPlayCards(), 500);
+    } else {
+      this.onPass();
+    }
+  },
+
+  // 聊天相关
   toggleChat() {
     this.setData({ showChat: !this.data.showChat });
   },
 
-  // 处理聊天消息
-  handleChatMessage(data) {
-    const chatMessages = [...this.data.chatMessages, data].slice(-50);
-    this.setData({
-      chatMessages,
-      lastMsgId: `msg-${chatMessages.length - 1}`
-    });
+  sendEmoji(e) {
+    const emoji = e.currentTarget.dataset.emoji;
+    wx.showToast({ title: `发送: ${emoji}`, icon: 'none' });
   },
 
-  // 输入聊天内容
+  sendPhrase(e) {
+    const phrase = e.currentTarget.dataset.phrase;
+    wx.showToast({ title: `发送: ${phrase}`, icon: 'none' });
+  },
+
   onChatInput(e) {
     this.setData({ chatInput: e.detail.value });
   },
 
-  // 发送聊天
   sendChat() {
-    const message = this.data.chatInput.trim();
-    if (!message) return;
-    
-    app.sendMessage('chatMessage', {
-      room: this.data.roomId,
-      message
-    });
-    
-    this.setData({ chatInput: '' });
-  },
-
-  // 发送表情
-  sendEmoji(e) {
-    const emoji = e.currentTarget.dataset.emoji;
-    app.sendMessage('chatMessage', {
-      room: this.data.roomId,
-      message: emoji,
-      isEmoji: true
-    });
-  },
-
-  // 发送快捷短语
-  sendPhrase(e) {
-    const phrase = e.currentTarget.dataset.phrase;
-    app.sendMessage('chatMessage', {
-      room: this.data.roomId,
-      message: phrase
-    });
-  },
-
-  // 分享
-  onShareAppMessage() {
-    return {
-      title: '来耀金斗地主一起玩！',
-      path: `/pages/game/game?roomId=${this.data.roomId}`,
-      imageUrl: '/images/share-game.png'
-    };
+    const msg = this.data.chatInput;
+    if (msg) {
+      wx.showToast({ title: `发送: ${msg}`, icon: 'none' });
+      this.setData({ chatInput: '' });
+    }
   }
 });

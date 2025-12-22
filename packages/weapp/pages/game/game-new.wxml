@@ -1,0 +1,400 @@
+<!--pages/game/game.wxml - 要进游戏主界面 (美化版)-->
+<view class="game-container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration">
+    <view class="bg-pattern"></view>
+    <view class="bg-glow"></view>
+  </view>
+
+  <!-- 游戏桌面 -->
+  <view class="game-table">
+    <!-- 桌面纹理 -->
+    <view class="table-felt"></view>
+    <view class="table-border"></view>
+    
+    <!-- 房间信息栏 -->
+    <view class="room-header">
+      <view class="room-info-left">
+        <text class="room-label">房间</text>
+        <text class="room-id">{{roomId}}</text>
+      </view>
+      <view class="room-info-center">
+        <view class="multiplier-badge {{multiplier > 1 ? 'multiplier-active' : ''}}">
+          <text class="multiplier-icon">🔥</text>
+          <text class="multiplier-value">x{{multiplier}}</text>
+        </view>
+      </view>
+      <view class="room-info-right">
+        <view class="menu-btn" bindtap="showMenu">
+          <text class="menu-icon">⚙️</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 对手玩家区域 - 上方 -->
+    <view class="opponent-area opponent-top {{currentTurn === opponents[0].index ? 'is-turn' : ''}} {{opponents[0].finished ? 'is-finished' : ''}}" wx:if="{{opponents[0]}}">
+      <view class="player-panel">
+        <view class="player-avatar-wrap">
+          <view class="avatar avatar-sm avatar-placeholder" wx:if="{{!opponents[0].avatar}}">
+            <text>{{opponents[0].name[0] || '?'}}</text>
+          </view>
+          <image class="avatar avatar-sm" src="{{opponents[0].avatar}}" mode="aspectFill" wx:if="{{opponents[0].avatar}}" />
+          <view class="turn-indicator" wx:if="{{currentTurn === opponents[0].index}}"></view>
+          <view class="rank-badge" wx:if="{{opponents[0].finishRank}}">
+            <text>{{opponents[0].finishRank}}</text>
+          </view>
+        </view>
+        <view class="player-details">
+          <text class="player-name">{{opponents[0].name}}</text>
+          <view class="card-count-badge">
+            <text class="card-icon">🃏</text>
+            <text class="card-num">{{opponents[0].cardCount}}</text>
+          </view>
+        </view>
+      </view>
+      <!-- 对手出的牌 -->
+      <view class="opponent-played" wx:if="{{opponents[0].lastPlay && opponents[0].lastPlay.length > 0}}">
+        <view class="played-cards-row animate-slide-down">
+          <view class="poker-card poker-card-sm {{getCardColorClass(card)}}" 
+                wx:for="{{opponents[0].lastPlay}}" wx:key="index"
+                style="margin-left: {{index > 0 ? '-20rpx' : '0'}}">
+            <text class="card-rank">{{card.displayRank}}</text>
+            <text class="card-suit">{{card.suit}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="pass-indicator animate-fade-in" wx:if="{{opponents[0].passed}}">
+        <text>过</text>
+      </view>
+    </view>
+
+    <!-- 对手玩家区域 - 左边 -->
+    <view class="opponent-area opponent-left {{currentTurn === opponents[1].index ? 'is-turn' : ''}} {{opponents[1].finished ? 'is-finished' : ''}}" wx:if="{{opponents[1]}}">
+      <view class="player-panel player-panel-vertical">
+        <view class="player-avatar-wrap">
+          <view class="avatar avatar-sm avatar-placeholder" wx:if="{{!opponents[1].avatar}}">
+            <text>{{opponents[1].name[0] || '?'}}</text>
+          </view>
+          <image class="avatar avatar-sm" src="{{opponents[1].avatar}}" mode="aspectFill" wx:if="{{opponents[1].avatar}}" />
+          <view class="turn-indicator" wx:if="{{currentTurn === opponents[1].index}}"></view>
+          <view class="rank-badge" wx:if="{{opponents[1].finishRank}}">
+            <text>{{opponents[1].finishRank}}</text>
+          </view>
+        </view>
+        <text class="player-name">{{opponents[1].name}}</text>
+        <view class="card-count-badge">
+          <text class="card-icon">🃏</text>
+          <text class="card-num">{{opponents[1].cardCount}}</text>
+        </view>
+      </view>
+      <view class="opponent-played opponent-played-left" wx:if="{{opponents[1].lastPlay && opponents[1].lastPlay.length > 0}}">
+        <view class="played-cards-col animate-slide-right">
+          <view class="poker-card poker-card-sm {{getCardColorClass(card)}}" 
+                wx:for="{{opponents[1].lastPlay}}" wx:key="index"
+                style="margin-top: {{index > 0 ? '-60rpx' : '0'}}">
+            <text class="card-rank">{{card.displayRank}}</text>
+            <text class="card-suit">{{card.suit}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="pass-indicator animate-fade-in" wx:if="{{opponents[1].passed}}">
+        <text>过</text>
+      </view>
+    </view>
+
+    <!-- 对手玩家区域 - 右边 -->
+    <view class="opponent-area opponent-right {{currentTurn === opponents[2].index ? 'is-turn' : ''}} {{opponents[2].finished ? 'is-finished' : ''}}" wx:if="{{opponents[2]}}">
+      <view class="player-panel player-panel-vertical">
+        <view class="player-avatar-wrap">
+          <view class="avatar avatar-sm avatar-placeholder" wx:if="{{!opponents[2].avatar}}">
+            <text>{{opponents[2].name[0] || '?'}}</text>
+          </view>
+          <image class="avatar avatar-sm" src="{{opponents[2].avatar}}" mode="aspectFill" wx:if="{{opponents[2].avatar}}" />
+          <view class="turn-indicator" wx:if="{{currentTurn === opponents[2].index}}"></view>
+          <view class="rank-badge" wx:if="{{opponents[2].finishRank}}">
+            <text>{{opponents[2].finishRank}}</text>
+          </view>
+        </view>
+        <text class="player-name">{{opponents[2].name}}</text>
+        <view class="card-count-badge">
+          <text class="card-icon">🃏</text>
+          <text class="card-num">{{opponents[2].cardCount}}</text>
+        </view>
+      </view>
+      <view class="opponent-played opponent-played-right" wx:if="{{opponents[2].lastPlay && opponents[2].lastPlay.length > 0}}">
+        <view class="played-cards-col animate-slide-left">
+          <view class="poker-card poker-card-sm {{getCardColorClass(card)}}" 
+                wx:for="{{opponents[2].lastPlay}}" wx:key="index"
+                style="margin-top: {{index > 0 ? '-60rpx' : '0'}}">
+            <text class="card-rank">{{card.displayRank}}</text>
+            <text class="card-suit">{{card.suit}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="pass-indicator animate-fade-in" wx:if="{{opponents[2].passed}}">
+        <text>过</text>
+      </view>
+    </view>
+
+    <!-- 中央出牌区域 -->
+    <view class="center-play-area">
+      <view class="center-cards-wrapper" wx:if="{{centerCards.length > 0}}">
+        <view class="center-cards animate-card-play">
+          <view class="poker-card {{getCardColorClass(card)}}" 
+                wx:for="{{centerCards}}" wx:key="index"
+                style="margin-left: {{index > 0 ? '-35rpx' : '0'}}; transform: rotate({{(index - centerCards.length/2) * 2}}deg)">
+            <text class="card-rank">{{card.displayRank}}</text>
+            <text class="card-suit">{{card.suit}}</text>
+          </view>
+        </view>
+        <view class="play-type-label" wx:if="{{playLabel}}">
+          <text>{{playLabel}}</text>
+        </view>
+      </view>
+      
+      <!-- 牌桌中心LOGO -->
+      <view class="table-logo" wx:if="{{!centerCards.length && !showBombEffect}}">
+        <text class="logo-text">要进</text>
+        <text class="logo-sub">YAOJIN</text>
+      </view>
+    </view>
+
+    <!-- 特效层 -->
+    <view class="effects-layer">
+      <!-- 炸弹特效 -->
+      <view class="bomb-effect {{bombEffectType}}" wx:if="{{showBombEffect}}">
+        <view class="bomb-animation">
+          <text class="bomb-text">{{bombText}}</text>
+          <view class="bomb-particles">
+            <view class="particle" wx:for="{{12}}" wx:key="index"></view>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 接风特效 -->
+      <view class="jiefeng-effect" wx:if="{{showJiefengEffect}}">
+        <text class="jiefeng-text">接风!</text>
+      </view>
+      
+      <!-- 起炸特效 -->
+      <view class="qizha-effect" wx:if="{{showQizhaEffect}}">
+        <text class="qizha-text">起!</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部玩家区域 -->
+  <view class="player-bottom-area">
+    <!-- 玩家信息条 -->
+    <view class="my-player-bar">
+      <view class="my-info-section">
+        <view class="my-avatar-wrap">
+          <view class="avatar avatar-placeholder" wx:if="{{!myInfo.avatar}}">
+            <text>{{myInfo.name[0] || '我'}}</text>
+          </view>
+          <image class="avatar" src="{{myInfo.avatar}}" mode="aspectFill" wx:if="{{myInfo.avatar}}" />
+          <view class="my-level">Lv.{{myInfo.level || 1}}</view>
+        </view>
+        <view class="my-details">
+          <text class="my-name">{{myInfo.name}}</text>
+          <view class="my-coins">
+            <text class="coins-icon">💰</text>
+            <text class="coins-value">{{myInfo.coins}}</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 出牌倒计时 -->
+      <view class="timer-section {{isMyTurn ? 'timer-active' : ''}}" wx:if="{{isMyTurn}}">
+        <view class="timer-ring">
+          <view class="timer-progress" style="--progress: {{(timeLeft/30) * 100}}%"></view>
+          <text class="timer-text">{{timeLeft}}</text>
+        </view>
+        <text class="timer-label">{{cannotPlay ? '无牌可出' : '轮到你了'}}</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮区 -->
+    <view class="action-buttons {{isMyTurn ? 'actions-active' : 'actions-disabled'}}">
+      <view class="btn btn-danger action-btn" bindtap="handlePass" wx:if="{{canPass}}">
+        <text class="btn-icon">✖</text>
+        <text class="btn-label">不要</text>
+      </view>
+      <view class="btn btn-warning action-btn" bindtap="handleHint">
+        <text class="btn-icon">💡</text>
+        <text class="btn-label">提示</text>
+      </view>
+      <view class="btn btn-success action-btn {{selectedCards.length === 0 ? 'btn-disabled' : ''}}" bindtap="handlePlay">
+        <text class="btn-icon">✓</text>
+        <text class="btn-label">出牌</text>
+      </view>
+      <view class="btn {{autoPlay ? 'btn-secondary' : 'btn-ghost'}} action-btn" bindtap="toggleAutoPlay">
+        <text class="btn-icon">🤖</text>
+        <text class="btn-label">{{autoPlay ? '托管中' : '托管'}}</text>
+      </view>
+    </view>
+
+    <!-- 手牌区域 -->
+    <view class="hand-section">
+      <scroll-view class="hand-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
+        <view class="hand-cards">
+          <view class="poker-card hand-card {{selectedCards[index] ? 'poker-card-selected' : ''}} {{getCardColorClass(card)}} {{card.isTribute ? 'card-tribute' : ''}}"
+                wx:for="{{myCards}}" 
+                wx:key="index"
+                bindtap="toggleCard"
+                data-index="{{index}}"
+                style="margin-left: {{index > 0 ? '-35rpx' : '0'}}; animation-delay: {{index * 0.03}}s">
+            <text class="card-rank">{{card.displayRank}}</text>
+            <text class="card-suit">{{card.suit}}</text>
+            <view class="tribute-mark" wx:if="{{card.isTribute}}">贡</view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="hand-count">
+        <text>{{myCards.length}}张</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 聊天入口 -->
+  <view class="chat-fab" bindtap="toggleChat">
+    <text class="chat-icon">💬</text>
+    <view class="chat-badge" wx:if="{{unreadMessages > 0}}">{{unreadMessages}}</view>
+  </view>
+
+  <!-- 快捷聊天面板 -->
+  <view class="quick-chat-panel {{showQuickChat ? 'show' : ''}}" wx:if="{{showQuickChat}}">
+    <view class="quick-chat-header">
+      <text class="quick-chat-title">快捷聊天</text>
+      <view class="quick-chat-close" bindtap="toggleChat">×</view>
+    </view>
+    
+    <view class="emoji-grid">
+      <view class="emoji-item" wx:for="{{emojis}}" wx:key="*this" bindtap="sendEmoji" data-emoji="{{item}}">
+        <text>{{item}}</text>
+      </view>
+    </view>
+    
+    <view class="divider"></view>
+    
+    <view class="phrase-list">
+      <view class="phrase-item" wx:for="{{quickPhrases}}" wx:key="*this" bindtap="sendPhrase" data-phrase="{{item}}">
+        <text>{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 菜单弹窗 -->
+  <view class="modal-overlay" wx:if="{{showMenu}}" bindtap="hideMenu">
+    <view class="modal-content menu-modal" catchtap="">
+      <text class="modal-title">游戏菜单</text>
+      
+      <view class="menu-options">
+        <view class="menu-item" bindtap="toggleSound">
+          <text class="menu-icon">{{soundEnabled ? '🔊' : '🔇'}}</text>
+          <text class="menu-label">{{soundEnabled ? '关闭音效' : '开启音效'}}</text>
+        </view>
+        <view class="menu-item" bindtap="toggleMusic">
+          <text class="menu-icon">{{musicEnabled ? '🎵' : '🎵'}}</text>
+          <text class="menu-label">{{musicEnabled ? '关闭音乐' : '开启音乐'}}</text>
+        </view>
+        <view class="menu-item" bindtap="viewRules">
+          <text class="menu-icon">📖</text>
+          <text class="menu-label">游戏规则</text>
+        </view>
+        <view class="menu-item menu-item-danger" bindtap="leaveGame">
+          <text class="menu-icon">🚪</text>
+          <text class="menu-label">退出游戏</text>
+        </view>
+      </view>
+      
+      <view class="btn btn-ghost btn-block mt-lg" bindtap="hideMenu">
+        <text>返回游戏</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 进贡/回贡弹窗 -->
+  <view class="modal-overlay" wx:if="{{showTributeModal}}">
+    <view class="modal-content tribute-modal">
+      <text class="modal-title">{{tributeType === 'give' ? '进贡' : '回贡'}}</text>
+      <text class="tribute-desc">{{tributeDescription}}</text>
+      
+      <view class="tribute-cards">
+        <view class="poker-card {{getCardColorClass(card)}} {{selectedTributeCards[index] ? 'poker-card-selected' : ''}}"
+              wx:for="{{tributeCards}}" wx:key="index"
+              bindtap="toggleTributeCard" data-index="{{index}}">
+          <text class="card-rank">{{card.displayRank}}</text>
+          <text class="card-suit">{{card.suit}}</text>
+        </view>
+      </view>
+      
+      <view class="btn btn-primary btn-block mt-lg" bindtap="confirmTribute">
+        <text>确认{{tributeType === 'give' ? '进贡' : '回贡'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 游戏结束弹窗 -->
+  <view class="modal-overlay" wx:if="{{showGameOver}}">
+    <view class="modal-content game-over-modal">
+      <view class="result-header {{myRank <= 2 ? 'result-win' : 'result-lose'}}">
+        <text class="result-icon">{{myRank === 1 ? '🏆' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '😢'}}</text>
+        <text class="result-title">{{myRank === 1 ? '头游!' : myRank === 2 ? '二游!' : myRank === 3 ? '三游' : '末游'}}</text>
+      </view>
+      
+      <view class="score-change {{scoreChange >= 0 ? 'score-win' : 'score-lose'}}">
+        <text>{{scoreChange >= 0 ? '+' : ''}}{{scoreChange}}</text>
+        <text class="score-label">金币</text>
+      </view>
+      
+      <view class="final-rankings">
+        <view class="ranking-item" wx:for="{{finalRankings}}" wx:key="index">
+          <view class="ranking-pos">
+            <text>{{index + 1}}</text>
+          </view>
+          <view class="ranking-player">
+            <view class="avatar avatar-sm avatar-placeholder">
+              <text>{{item.name[0]}}</text>
+            </view>
+            <text class="ranking-name">{{item.name}}</text>
+          </view>
+          <text class="ranking-score {{item.score >= 0 ? 'text-success' : 'text-danger'}}">
+            {{item.score >= 0 ? '+' : ''}}{{item.score}}
+          </text>
+        </view>
+      </view>
+      
+      <view class="game-over-actions">
+        <view class="btn btn-primary btn-lg" bindtap="playAgain" wx:if="{{canPlayAgain}}">
+          <text>🔄 再来一局</text>
+        </view>
+        <view class="btn btn-ghost btn-lg" bindtap="backToLobby">
+          <text>🏠 返回大厅</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 等待其他玩家弹窗 -->
+  <view class="waiting-overlay" wx:if="{{isWaiting}}">
+    <view class="waiting-content">
+      <view class="waiting-spinner">
+        <view class="loading-spinner"></view>
+      </view>
+      <text class="waiting-text">{{waitingMessage}}</text>
+      <view class="waiting-players">
+        <view class="waiting-player {{item.ready ? 'ready' : ''}}" wx:for="{{waitingPlayers}}" wx:key="index">
+          <view class="avatar avatar-sm avatar-placeholder">
+            <text>{{item.name[0] || '?'}}</text>
+          </view>
+          <text class="waiting-name">{{item.name || '等待加入...'}}</text>
+          <text class="ready-icon" wx:if="{{item.ready}}">✓</text>
+        </view>
+      </view>
+      <view class="btn btn-danger mt-lg" bindtap="cancelWaiting" wx:if="{{canCancelWaiting}}">
+        <text>取消</text>
+      </view>
+    </view>
+  </view>
+</view>

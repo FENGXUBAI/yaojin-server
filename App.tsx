@@ -258,8 +258,11 @@ export default function App() {
     '跳楼基.mp3'
   ];
 
+  // Koyeb 云服务器地址
+  const KOYEB_SERVER = 'https://wise-galliform-zanli-2885a498.koyeb.app';
+  
   const [serverUrl, setServerUrl] = useState(
-    Platform.OS === 'web' ? window.location.origin : 'http://192.168.5.19:3000'
+    Platform.OS === 'web' ? window.location.origin : KOYEB_SERVER
   );
   const [connecting, setConnecting] = useState(false);
   const [connectStatus, setConnectStatus] = useState('');

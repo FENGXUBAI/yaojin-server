@@ -1,0 +1,685 @@
+/* pages/profile/profile.wxss - 个人中心样式（美化版） */
+@import "../../styles/theme.wxss";
+
+/* ========== 容器 ========== */
+.profile-container {
+  min-height: 100vh;
+  background: var(--bg-dark);
+  padding-bottom: 60rpx;
+}
+
+/* ========== 背景 ========== */
+.bg-decoration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 400rpx;
+  background: linear-gradient(180deg, rgba(45, 90, 61, 0.6) 0%, transparent 100%);
+}
+
+.bg-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.02;
+  background-image: 
+    repeating-linear-gradient(45deg, #d4af37 0, #d4af37 1px, transparent 0, transparent 50%);
+  background-size: 60rpx 60rpx;
+}
+
+/* ========== 用户卡片 ========== */
+.user-card {
+  position: relative;
+  z-index: 10;
+  margin: 24rpx;
+  padding: 32rpx;
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-medium) 100%);
+  border-radius: var(--radius-xl);
+  border: 1rpx solid rgba(212, 175, 55, 0.3);
+}
+
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+}
+
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4rpx solid var(--primary);
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #1a1a1a;
+}
+
+.avatar-edit-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 36rpx;
+  height: 36rpx;
+  background: var(--bg-dark);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20rpx;
+  border: 2rpx solid var(--primary);
+}
+
+.level-ring {
+  position: absolute;
+  top: -6rpx;
+  left: -6rpx;
+  right: -6rpx;
+  bottom: -6rpx;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--primary) 0%,
+    var(--primary) var(--progress),
+    rgba(255, 255, 255, 0.1) var(--progress)
+  );
+  mask: radial-gradient(transparent 55rpx, black 56rpx, black 66rpx, transparent 67rpx);
+  -webkit-mask: radial-gradient(transparent 55rpx, black 56rpx, black 66rpx, transparent 67rpx);
+}
+
+.level-badge {
+  display: none;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.user-name {
+  font-size: var(--font-xl);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.vip-badge {
+  background: linear-gradient(90deg, #ffd700 0%, #ff8c00 100%);
+  padding: 4rpx 12rpx;
+  border-radius: var(--radius-full);
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #1a1a1a;
+}
+
+.user-id {
+  display: block;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: 12rpx;
+}
+
+.user-signature {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 16rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.signature-text {
+  flex: 1;
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+}
+
+.signature-edit {
+  font-size: var(--font-sm);
+  opacity: 0.5;
+}
+
+.currency-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.currency-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.currency-icon {
+  font-size: 28rpx;
+}
+
+.currency-value {
+  flex: 1;
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.currency-add {
+  width: 32rpx;
+  height: 32rpx;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #1a1a1a;
+}
+
+/* ========== 统计面板 ========== */
+.stats-panel {
+  position: relative;
+  z-index: 10;
+  margin: 0 24rpx 24rpx;
+  padding: 24rpx;
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-medium) 100%);
+  border-radius: var(--radius-xl);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.stats-title {
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.stats-more {
+  font-size: var(--font-sm);
+  color: var(--primary);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 8rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.stat-value {
+  font-size: var(--font-xl);
+  font-weight: bold;
+  color: var(--text-primary);
+  margin-bottom: 4rpx;
+}
+
+.stat-value.win {
+  color: var(--success);
+}
+
+.stat-value.highlight {
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.recent-record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 20rpx;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.recent-title {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.record-dots {
+  display: flex;
+  gap: 8rpx;
+}
+
+.record-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.record-dot.win {
+  background: var(--success);
+}
+
+.record-dot.lose {
+  background: var(--danger);
+}
+
+/* ========== 成就面板 ========== */
+.achievement-panel {
+  position: relative;
+  z-index: 10;
+  margin: 0 24rpx 24rpx;
+  padding: 24rpx;
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-medium) 100%);
+  border-radius: var(--radius-xl);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.panel-title {
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.panel-more {
+  font-size: var(--font-sm);
+  color: var(--primary);
+}
+
+.achievement-scroll {
+  white-space: nowrap;
+  margin: 0 -24rpx;
+  padding: 0 24rpx;
+}
+
+.achievement-list {
+  display: inline-flex;
+  gap: 16rpx;
+}
+
+.achievement-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100rpx;
+  padding: 16rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  transition: all var(--transition-fast);
+}
+
+.achievement-item.unlocked {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.achievement-item.locked {
+  opacity: 0.5;
+}
+
+.achievement-icon {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-bottom: 8rpx;
+}
+
+.achievement-name {
+  font-size: 18rpx;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: normal;
+  word-break: break-all;
+}
+
+/* ========== 菜单面板 ========== */
+.menu-panel {
+  position: relative;
+  z-index: 10;
+  padding: 0 24rpx;
+}
+
+.menu-group {
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-medium) 100%);
+  border-radius: var(--radius-xl);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 16rpx;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.05);
+  transition: background var(--transition-fast);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.menu-icon-wrap {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+  margin-right: 16rpx;
+}
+
+.menu-icon {
+  font-size: 28rpx;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: var(--font-md);
+  color: var(--text-primary);
+}
+
+.menu-badge {
+  min-width: 32rpx;
+  height: 32rpx;
+  background: var(--danger);
+  border-radius: 16rpx;
+  font-size: 20rpx;
+  font-weight: bold;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+  margin-right: 12rpx;
+}
+
+.menu-arrow {
+  font-size: var(--font-xl);
+  color: var(--text-muted);
+}
+
+/* ========== 退出登录 ========== */
+.logout-section {
+  position: relative;
+  z-index: 10;
+  padding: 40rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: rgba(244, 67, 54, 0.15);
+  border: 1rpx solid rgba(244, 67, 54, 0.4);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  font-size: var(--font-md);
+  color: var(--danger);
+  transition: all var(--transition-fast);
+}
+
+.logout-btn:active {
+  background: rgba(244, 67, 54, 0.3);
+}
+
+.version-info {
+  margin-top: 24rpx;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+/* ========== 弹窗 ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-normal);
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-container {
+  width: 85%;
+  max-width: 560rpx;
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-medium) 100%);
+  border-radius: var(--radius-xl);
+  border: 2rpx solid rgba(212, 175, 55, 0.3);
+  transform: scale(0.9);
+  opacity: 0;
+  transition: all var(--transition-normal);
+}
+
+.modal-overlay.show .modal-container {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-title {
+  font-size: var(--font-lg);
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.modal-close {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-lg);
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 24rpx;
+}
+
+.signature-input {
+  width: 100%;
+  height: 160rpx;
+  padding: 16rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-md);
+  box-sizing: border-box;
+}
+
+.char-count {
+  display: block;
+  text-align: right;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-top: 8rpx;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  font-size: var(--font-md);
+  color: var(--text-secondary);
+}
+
+.btn-confirm {
+  flex: 1;
+  padding: 20rpx;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: #1a1a1a;
+}
+
+/* ========== 成就详情弹窗 ========== */
+.achievement-detail {
+  text-align: center;
+  padding: 40rpx;
+}
+
+.achievement-detail-icon {
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 20rpx;
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60rpx;
+}
+
+.achievement-detail-name {
+  display: block;
+  font-size: var(--font-xl);
+  font-weight: bold;
+  color: var(--primary);
+  margin-bottom: 12rpx;
+}
+
+.achievement-detail-desc {
+  display: block;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  margin-bottom: 24rpx;
+}
+
+.achievement-progress {
+  margin-bottom: 24rpx;
+}
+
+.progress-bar {
+  height: 12rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6rpx;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+  border-radius: 6rpx;
+}
+
+.progress-text {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.achievement-reward {
+  padding: 16rpx 24rpx;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.reward-label {
+  display: block;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  margin-bottom: 4rpx;
+}
+
+.reward-value {
+  font-size: var(--font-md);
+  font-weight: bold;
+  color: var(--primary);
+}

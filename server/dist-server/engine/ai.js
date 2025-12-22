@@ -7,17 +7,16 @@ const patterns_1 = require("./patterns");
 const ai_analysis_1 = require("./ai_analysis");
 function cardsKey(cards) {
     const s = [...cards]
-        .map(c => { var _a; return `${c.rank}${(_a = c.suit) !== null && _a !== void 0 ? _a : ''}`; })
+        .map(c => `${c.rank}${c.suit ?? ''}`)
         .sort()
         .join('|');
     return s;
 }
 function rankCounts(hand) {
-    var _a;
     const m = new Map();
     for (const c of hand) {
         const key = c.isJoker ? c.rank : c.rank;
-        const arr = (_a = m.get(key)) !== null && _a !== void 0 ? _a : [];
+        const arr = m.get(key) ?? [];
         arr.push(c);
         m.set(key, arr);
     }
@@ -26,7 +25,6 @@ function rankCounts(hand) {
     return m;
 }
 function scoreHintOption(hand, cards, lastPlay) {
-    var _a, _b, _c, _d;
     const counts = rankCounts(hand);
     const pat = (0, patterns_1.detectPattern)(cards);
     const remainingAfter = hand.length - cards.length;
@@ -42,7 +40,7 @@ function scoreHintOption(hand, cards, lastPlay) {
         score -= 1000;
     // Penalize using bombs / special high-impact plays as late fallback
     if (pat) {
-        const isKingBomb = pat.type === 'PAIR' && ((_a = pat.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb);
+        const isKingBomb = pat.type === 'PAIR' && pat.extra?.isKingBomb;
         if (isKingBomb)
             score += 200;
         if (pat.type === 'FOUR')
@@ -54,10 +52,10 @@ function scoreHintOption(hand, cards, lastPlay) {
     const usedByRank = new Map();
     for (const c of cards) {
         const k = c.isJoker ? c.rank : c.rank;
-        usedByRank.set(k, ((_b = usedByRank.get(k)) !== null && _b !== void 0 ? _b : 0) + 1);
+        usedByRank.set(k, (usedByRank.get(k) ?? 0) + 1);
     }
     for (const [r, used] of usedByRank.entries()) {
-        const total = (_d = (_c = counts.get(r)) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0;
+        const total = counts.get(r)?.length ?? 0;
         if (total >= 2 && used === 1)
             score += 15; // split pair/triple/quad
         if (total >= 3 && used === 2)
@@ -74,14 +72,12 @@ function scoreHintOption(hand, cards, lastPlay) {
     return score;
 }
 function getHintOptions(hand, lastPlay) {
-    var _a;
     if (!hand || hand.length === 0)
         return [];
     const counts = rankCounts(hand);
     const options = [];
     const seen = new Set();
     function addOption(cards) {
-        var _a;
         const key = cardsKey(cards);
         if (seen.has(key))
             return;
@@ -102,7 +98,7 @@ function getHintOptions(hand, lastPlay) {
                 return;
             }
         }
-        if (lastPlay.type === 'FOUR' || (lastPlay.type === 'PAIR' && ((_a = lastPlay.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))) {
+        if (lastPlay.type === 'FOUR' || (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb)) {
             if (cards.length === 3 && cards.every(c => !c.isJoker && c.rank === '4')) {
                 seen.add(key);
                 options.push(cards);
@@ -166,7 +162,7 @@ function getHintOptions(hand, lastPlay) {
                 const seq = run.slice(start, start + len);
                 const cards = [];
                 for (const r of seq) {
-                    const arr = (_a = counts.get(r)) !== null && _a !== void 0 ? _a : [];
+                    const arr = counts.get(r) ?? [];
                     const nonJokers = arr.filter(c => !c.isJoker);
                     if (nonJokers.length < 2) {
                         cards.length = 0;
@@ -184,7 +180,6 @@ function getHintOptions(hand, lastPlay) {
     return options.slice(0, 12);
 }
 function decideBotAction(state, playerIndex) {
-    var _a, _b;
     const hand = state.hands[playerIndex];
     // Determine effective last play
     let effectiveLastPlay = state.lastPlay;
@@ -220,10 +215,9 @@ function decideBotAction(state, playerIndex) {
             // Sort patterns: play small non-bombs first
             const candidates = [...currentSplit];
             candidates.sort((a, b) => {
-                var _a, _b;
                 // Prefer non-bombs
-                const aBomb = a.type === 'FOUR' || (a.type === 'PAIR' && ((_a = a.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb)) || a.type === 'TRIPLE';
-                const bBomb = b.type === 'FOUR' || (b.type === 'PAIR' && ((_b = b.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb)) || b.type === 'TRIPLE';
+                const aBomb = a.type === 'FOUR' || (a.type === 'PAIR' && a.extra?.isKingBomb) || a.type === 'TRIPLE';
+                const bBomb = b.type === 'FOUR' || (b.type === 'PAIR' && b.extra?.isKingBomb) || b.type === 'TRIPLE';
                 if (aBomb && !bBomb)
                     return 1;
                 if (!aBomb && bBomb)
@@ -247,9 +241,9 @@ function decideBotAction(state, playerIndex) {
         }
     }
     // Strategic Pass Check
-    const isOpponentBomb = effectiveLastPlay.type === 'TRIPLE' || effectiveLastPlay.type === 'FOUR' || (effectiveLastPlay.type === 'PAIR' && ((_a = effectiveLastPlay.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb));
+    const isOpponentBomb = effectiveLastPlay.type === 'TRIPLE' || effectiveLastPlay.type === 'FOUR' || (effectiveLastPlay.type === 'PAIR' && effectiveLastPlay.extra?.isKingBomb);
     const myMovePattern = (0, patterns_1.detectPattern)(bestOption);
-    const isMyBomb = myMovePattern.type === 'TRIPLE' || myMovePattern.type === 'FOUR' || (myMovePattern.type === 'PAIR' && ((_b = myMovePattern.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb));
+    const isMyBomb = myMovePattern.type === 'TRIPLE' || myMovePattern.type === 'FOUR' || (myMovePattern.type === 'PAIR' && myMovePattern.extra?.isKingBomb);
     if (!isOpponentBomb && isMyBomb) {
         // Opponent played normal, I am using a bomb.
         // Only do this if I am close to winning or opponent is close to winning.

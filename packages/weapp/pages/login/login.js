@@ -10,8 +10,8 @@ Page({
     // 检查是否已登录
     const token = wx.getStorageSync('token');
     if (token) {
-      wx.redirectTo({
-        url: '/pages/index/index'
+      wx.switchTab({
+        url: '/pages/lobby/lobby'
       });
     }
   },
@@ -51,10 +51,10 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: '登录成功', icon: 'success' });
 
-      // 5. 跳转首页
+      // 5. 跳转大厅
       setTimeout(() => {
-        wx.redirectTo({
-          url: '/pages/index/index'
+        wx.switchTab({
+          url: '/pages/lobby/lobby'
         });
       }, 500);
 
@@ -91,10 +91,10 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: '登录成功', icon: 'success' });
 
-      // 跳转首页
+      // 跳转大厅
       setTimeout(() => {
-        wx.redirectTo({
-          url: '/pages/index/index'
+        wx.switchTab({
+          url: '/pages/lobby/lobby'
         });
       }, 500);
 

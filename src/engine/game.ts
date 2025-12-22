@@ -1,4 +1,4 @@
-import { Card, Suit, createDeck, formatCard, makeCard, normalRanks, shuffle, suits } from './cards';
+import { Card, Suit, createDeck, formatCard, makeCard, normalRanks, shuffle, suits, nextInRing, straightStartValue, straightRing, findStraightRuns } from './cards';
 import { Pattern, detectPattern, canBeat } from './patterns';
 
 export interface GameState {
@@ -16,6 +16,16 @@ export interface GameState {
   status: 'playing' | 'tribute_return';
   pendingReturns: { actionBy: number; returnTo: number; count: number }[];
   multiplier: number;
+  jiefengState: JiefengState | null; // 接风状态
+}
+
+// 接风状态：当有人出牌后跑了，需要进行接风判定
+export interface JiefengState {
+  finishedPlayer: number; // 跑了的玩家
+  lastPlayCards: Pattern & { by: number }; // 跑了的玩家最后出的牌
+  nextPlayer: number; // 跑了的玩家的下家（可能获得接风权）
+  checkingPlayer: number; // 当前正在检查是否能压牌的玩家
+  skippedPlayers: number[]; // 已经跳过的玩家（都不能压）
 }
 export interface TablePlay {
   by: number;
@@ -89,6 +99,7 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
     status: 'playing',
     pendingReturns: [],
     multiplier: 1,
+    jiefengState: null,
   };
 }
 
@@ -173,10 +184,14 @@ function removeCardsFromHand(hand: Card[], toRemove: Card[]): Card[] {
 }
 
 function nextActivePlayer(state: GameState, from: number): number {
+  if (state.finishedOrder.length >= state.playerCount) return -1;
   let i = (from + 1) % state.playerCount;
+  let count = 0;
   // skip finished players
   while (state.finishedOrder.includes(i)) {
     i = (i + 1) % state.playerCount;
+    count++;
+    if (count > state.playerCount) return -1; // Safety break
   }
   return i;
 }
@@ -202,6 +217,42 @@ export function playTurn(state: GameState, action: Action): GameState {
     return { ...state, currentPlayer: nextActivePlayer(state, state.currentPlayer) };
   }
   if (action.type === 'pass') {
+    // 接风逻辑处理
+    if (state.jiefengState) {
+      const jf = state.jiefengState;
+      // 当前检查的玩家选择不压牌
+      const newSkipped = [...jf.skippedPlayers, state.currentPlayer];
+      
+      // 找下一个要检查的玩家（跳过已经pass的、跑了的、以及下家）
+      let nextChecker = nextActivePlayer(state, state.currentPlayer);
+      
+      // 如果转了一圈回到下家，或者只剩下家了，则下家接风
+      if (nextChecker === jf.nextPlayer || nextChecker === -1) {
+        // 接风成功：下家可以自由出牌
+        return {
+          ...state,
+          currentPlayer: jf.nextPlayer,
+          lastPlay: null, // 自由出牌
+          lastPlayOwner: null,
+          passesInRow: 0,
+          jiefengState: null,
+          currentTrickPlays: [],
+        };
+      }
+      
+      // 还有其他玩家需要检查
+      return {
+        ...state,
+        currentPlayer: nextChecker,
+        jiefengState: {
+          ...jf,
+          checkingPlayer: nextChecker,
+          skippedPlayers: newSkipped,
+        },
+      };
+    }
+    
+    // 正常pass逻辑
     const next = nextActivePlayer(state, state.currentPlayer);
     let lastPlay = state.lastPlay;
     let lastPlayOwner = state.lastPlayOwner;
@@ -219,7 +270,7 @@ export function playTurn(state: GameState, action: Action): GameState {
       currentTrickPlays = [];
     }
 
-    return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays };
+    return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays, jiefengState: null };
   }
   // play cards
   const hand = state.hands[state.currentPlayer];
@@ -253,6 +304,7 @@ export function playTurn(state: GameState, action: Action): GameState {
         passesInRow: 0,
         currentPlayer: nextActivePlayer(state, state.currentPlayer),
         tablePlays: [...(state.tablePlays ?? []), { by: state.currentPlayer, cards: action.cards }],
+        jiefengState: null,
       };
       return nextState;
     }
@@ -269,6 +321,7 @@ export function playTurn(state: GameState, action: Action): GameState {
         passesInRow: 0,
         currentPlayer: nextActivePlayer(state, state.currentPlayer),
         tablePlays: [...(state.tablePlays ?? []), { by: state.currentPlayer, cards: action.cards }],
+        jiefengState: null,
       };
       return nextState;
     }
@@ -320,15 +373,56 @@ export function playTurn(state: GameState, action: Action): GameState {
      finalTablePlays = [];
   }
 
+  // Calculate next player
+  const tempStateForNext = { ...state, finishedOrder };
+  let nextPlayer = -1;
+  if (finishedOrder.length < state.playerCount) {
+      nextPlayer = nextActivePlayer(tempStateForNext, state.currentPlayer);
+  }
+
+  // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
+  let jiefengState: JiefengState | null = null;
+  const playerJustFinished = newHand.length === 0 && !state.finishedOrder.includes(state.currentPlayer);
+  
+  if (playerJustFinished && finishedOrder.length < state.playerCount) {
+    // 玩家刚刚跑了，开始接风流程
+    const finishedPlayer = state.currentPlayer;
+    const lastPlayPattern = { ...pattern, by: state.currentPlayer };
+    
+    // 找到下家（跑了的人的下一个未完成的玩家）
+    const nextAfterFinished = nextActivePlayer({ ...state, finishedOrder }, finishedPlayer);
+    
+    if (nextAfterFinished !== -1) {
+      // 找到下家之后的下一个人来检查是否能压牌
+      const checkingPlayer = nextActivePlayer({ ...state, finishedOrder }, nextAfterFinished);
+      
+      if (checkingPlayer !== -1 && checkingPlayer !== nextAfterFinished) {
+        // 有其他玩家需要检查，进入接风流程
+        jiefengState = {
+          finishedPlayer,
+          lastPlayCards: lastPlayPattern,
+          nextPlayer: nextAfterFinished,
+          checkingPlayer,
+          skippedPlayers: [],
+        };
+        nextPlayer = checkingPlayer; // 先让检查的玩家决定是否要压
+      } else {
+        // 只剩一个活跃玩家，直接接风（无需检查）
+        nextPlayer = nextAfterFinished;
+      }
+    }
+  }
+
   const next: GameState = {
     ...state,
     hands: newHands.map(h => h.sort((a,b)=>b.sortValue-a.sortValue)),
     lastPlay: { ...pattern, by: state.currentPlayer },
     lastPlayOwner: state.currentPlayer,
     passesInRow: 0,
-    currentPlayer: nextActivePlayer(state, state.currentPlayer),
+    currentPlayer: nextPlayer,
     finishedOrder,
     tablePlays: finalTablePlays,
+    jiefengState,
   };
   return next;
 }

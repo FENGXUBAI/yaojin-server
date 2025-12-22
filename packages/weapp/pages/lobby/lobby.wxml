@@ -2,7 +2,10 @@
 <view class="lobby-container">
   <!-- 顶部用户信息 -->
   <view class="user-banner">
-    <image class="user-avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" />
+    <view class="user-avatar avatar-placeholder" wx:if="{{!userInfo.avatarUrl}}">
+      <text class="avatar-text">{{userInfo.nickname[0] || '游'}}</text>
+    </view>
+    <image class="user-avatar" src="{{userInfo.avatarUrl}}" wx:if="{{userInfo.avatarUrl}}" />
     <view class="user-info">
       <text class="user-name">{{userInfo.nickname || '游客'}}</text>
       <view class="user-stats">
@@ -23,7 +26,7 @@
   <view class="main-actions">
     <!-- 快速开始 -->
     <view class="action-card quick-start" bindtap="quickMatch">
-      <image class="action-bg" src="/images/bg-quick.png" mode="aspectFill" />
+      <view class="action-icon">🎮</view>
       <view class="action-content">
         <text class="action-title">快速开始</text>
         <text class="action-desc">自动匹配玩家</text>
@@ -35,7 +38,7 @@
 
     <!-- 好友房间 -->
     <view class="action-card friend-room" bindtap="showRoomActions">
-      <image class="action-bg" src="/images/bg-friend.png" mode="aspectFill" />
+      <view class="action-icon">👥</view>
       <view class="action-content">
         <text class="action-title">好友房间</text>
         <text class="action-desc">和好友一起玩</text>
@@ -47,7 +50,7 @@
 
     <!-- 比赛场 -->
     <view class="action-card tournament" bindtap="showTournament">
-      <image class="action-bg" src="/images/bg-tournament.png" mode="aspectFill" />
+      <view class="action-icon">🏆</view>
       <view class="action-content">
         <text class="action-title">比赛场</text>
         <text class="action-desc">赢取大奖</text>

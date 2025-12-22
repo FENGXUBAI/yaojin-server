@@ -1,0 +1,235 @@
+<!--pages/profile/profile-new.wxml - 个人中心（美化版）-->
+<view class="profile-container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration">
+    <view class="bg-header"></view>
+    <view class="bg-pattern"></view>
+  </view>
+
+  <!-- 用户卡片 -->
+  <view class="user-card">
+    <!-- 头像区域 -->
+    <view class="avatar-section">
+      <view class="avatar-wrapper" bindtap="changeAvatar">
+        <image class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill" wx:if="{{userInfo.avatarUrl}}"/>
+        <view class="avatar-placeholder" wx:else>
+          <text>{{userInfo.nickname[0] || '游'}}</text>
+        </view>
+        <view class="avatar-edit-badge">
+          <text>📷</text>
+        </view>
+      </view>
+      <view class="level-ring" style="--progress: {{levelProgress}}%">
+        <view class="level-badge">
+          <text class="level-num">{{userInfo.level || 1}}</text>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 用户信息 -->
+    <view class="user-info">
+      <view class="user-name-row">
+        <text class="user-name">{{userInfo.nickname || '游客玩家'}}</text>
+        <view class="vip-badge" wx:if="{{userInfo.vip}}">
+          <text>👑 VIP{{userInfo.vipLevel}}</text>
+        </view>
+      </view>
+      <text class="user-id">ID: {{userInfo.id || '000000'}}</text>
+      <view class="user-signature" bindtap="editSignature">
+        <text class="signature-text">{{userInfo.signature || '这个人很懒，什么都没写~'}}</text>
+        <text class="signature-edit">✏️</text>
+      </view>
+    </view>
+    
+    <!-- 货币 -->
+    <view class="currency-row">
+      <view class="currency-item" bindtap="goToShop">
+        <text class="currency-icon">🪙</text>
+        <text class="currency-value">{{userInfo.coins || 0}}</text>
+        <view class="currency-add">+</view>
+      </view>
+      <view class="currency-item" bindtap="goToShop">
+        <text class="currency-icon">💎</text>
+        <text class="currency-value">{{userInfo.diamonds || 0}}</text>
+        <view class="currency-add">+</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 数据统计面板 -->
+  <view class="stats-panel">
+    <view class="stats-header">
+      <text class="stats-title">战绩统计</text>
+      <text class="stats-more" bindtap="goToRecordDetail">详情 ›</text>
+    </view>
+    <view class="stats-grid">
+      <view class="stat-item">
+        <text class="stat-value">{{stats.totalGames || 0}}</text>
+        <text class="stat-label">总场次</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value win">{{stats.wins || 0}}</text>
+        <text class="stat-label">胜场</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.winRate || '0%'}}</text>
+        <text class="stat-label">胜率</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value highlight">{{stats.maxWinStreak || 0}}</text>
+        <text class="stat-label">最大连胜</text>
+      </view>
+    </view>
+    
+    <!-- 近期战绩 -->
+    <view class="recent-record">
+      <text class="recent-title">近10场战绩</text>
+      <view class="record-dots">
+        <view class="record-dot {{item ? 'win' : 'lose'}}" wx:for="{{recentResults}}" wx:key="index"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 成就展示 -->
+  <view class="achievement-panel">
+    <view class="panel-header">
+      <text class="panel-title">🏆 成就徽章</text>
+      <text class="panel-more" bindtap="goToAchievements">查看全部 ›</text>
+    </view>
+    <scroll-view class="achievement-scroll" scroll-x="true">
+      <view class="achievement-list">
+        <view class="achievement-item {{item.unlocked ? 'unlocked' : 'locked'}}" 
+              wx:for="{{achievements}}" wx:key="id" bindtap="showAchievementDetail" data-id="{{item.id}}">
+          <view class="achievement-icon">
+            <text>{{item.icon}}</text>
+          </view>
+          <text class="achievement-name">{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 功能菜单 -->
+  <view class="menu-panel">
+    <view class="menu-group">
+      <view class="menu-item" bindtap="goToInventory">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">🎒</text>
+        </view>
+        <text class="menu-text">我的背包</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToCollection">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">🃏</text>
+        </view>
+        <text class="menu-text">卡牌收藏</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToRecord">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">📊</text>
+        </view>
+        <text class="menu-text">战绩记录</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+    
+    <view class="menu-group">
+      <view class="menu-item" bindtap="goToFriends">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">👥</text>
+        </view>
+        <text class="menu-text">我的好友</text>
+        <view class="menu-badge" wx:if="{{friendRequests > 0}}">{{friendRequests}}</view>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToMail">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">📬</text>
+        </view>
+        <text class="menu-text">消息邮件</text>
+        <view class="menu-badge" wx:if="{{unreadMails > 0}}">{{unreadMails}}</view>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+    
+    <view class="menu-group">
+      <view class="menu-item" bindtap="goToSettings">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">⚙️</text>
+        </view>
+        <text class="menu-text">设置</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToHelp">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">❓</text>
+        </view>
+        <text class="menu-text">帮助中心</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToFeedback">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">💬</text>
+        </view>
+        <text class="menu-text">意见反馈</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="goToAbout">
+        <view class="menu-icon-wrap">
+          <text class="menu-icon">ℹ️</text>
+        </view>
+        <text class="menu-text">关于游戏</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 退出登录 -->
+  <view class="logout-section">
+    <view class="logout-btn" bindtap="onLogout">
+      <text>退出登录</text>
+    </view>
+    <text class="version-info">版本 {{version}}</text>
+  </view>
+
+  <!-- 签名编辑弹窗 -->
+  <view class="modal-overlay {{showSignatureModal ? 'show' : ''}}" bindtap="closeSignatureModal">
+    <view class="modal-container" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">编辑签名</text>
+        <view class="modal-close" bindtap="closeSignatureModal">✕</view>
+      </view>
+      <view class="modal-body">
+        <textarea class="signature-input" placeholder="写点什么吧..." value="{{tempSignature}}" bindinput="onSignatureInput" maxlength="50"/>
+        <text class="char-count">{{tempSignature.length || 0}}/50</text>
+        <view class="modal-actions">
+          <view class="btn-cancel" bindtap="closeSignatureModal">取消</view>
+          <view class="btn-confirm" bindtap="saveSignature">保存</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 成就详情弹窗 -->
+  <view class="modal-overlay {{showAchievementModal ? 'show' : ''}}" bindtap="closeAchievementModal">
+    <view class="modal-container achievement-detail" catchtap="">
+      <view class="achievement-detail-icon">
+        <text>{{selectedAchievement.icon}}</text>
+      </view>
+      <text class="achievement-detail-name">{{selectedAchievement.name}}</text>
+      <text class="achievement-detail-desc">{{selectedAchievement.description}}</text>
+      <view class="achievement-progress" wx:if="{{!selectedAchievement.unlocked}}">
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{selectedAchievement.progress}}%"></view>
+        </view>
+        <text class="progress-text">{{selectedAchievement.current}}/{{selectedAchievement.target}}</text>
+      </view>
+      <view class="achievement-reward">
+        <text class="reward-label">解锁奖励</text>
+        <text class="reward-value">{{selectedAchievement.reward}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -3,7 +3,10 @@
   <!-- 对手玩家 (上方) -->
   <view class="player-area player-top" wx:if="{{opponents[0]}}">
     <view class="player-info">
-      <image class="avatar avatar-small" src="{{opponents[0].avatar || '/images/default-avatar.png'}}" />
+      <view class="avatar avatar-small avatar-placeholder" wx:if="{{!opponents[0].avatar}}">
+        <text class="avatar-text">{{opponents[0].name[0] || '玩'}}</text>
+      </view>
+      <image class="avatar avatar-small" src="{{opponents[0].avatar}}" wx:if="{{opponents[0].avatar}}" />
       <text class="player-name">{{opponents[0].name}}</text>
       <text class="card-count">{{opponents[0].cardCount}}张</text>
     </view>
@@ -21,7 +24,10 @@
   <!-- 左边对手 -->
   <view class="player-area player-left" wx:if="{{opponents[1]}}">
     <view class="player-info">
-      <image class="avatar avatar-small" src="{{opponents[1].avatar || '/images/default-avatar.png'}}" />
+      <view class="avatar avatar-small avatar-placeholder" wx:if="{{!opponents[1].avatar}}">
+        <text class="avatar-text">{{opponents[1].name[0] || '玩'}}</text>
+      </view>
+      <image class="avatar avatar-small" src="{{opponents[1].avatar}}" wx:if="{{opponents[1].avatar}}" />
       <text class="player-name">{{opponents[1].name}}</text>
       <text class="card-count">{{opponents[1].cardCount}}张</text>
     </view>
@@ -36,7 +42,10 @@
   <!-- 右边对手 -->
   <view class="player-area player-right" wx:if="{{opponents[2]}}">
     <view class="player-info">
-      <image class="avatar avatar-small" src="{{opponents[2].avatar || '/images/default-avatar.png'}}" />
+      <view class="avatar avatar-small avatar-placeholder" wx:if="{{!opponents[2].avatar}}">
+        <text class="avatar-text">{{opponents[2].name[0] || '玩'}}</text>
+      </view>
+      <image class="avatar avatar-small" src="{{opponents[2].avatar}}" wx:if="{{opponents[2].avatar}}" />
       <text class="player-name">{{opponents[2].name}}</text>
       <text class="card-count">{{opponents[2].cardCount}}张</text>
     </view>
@@ -70,7 +79,10 @@
   <view class="player-area player-bottom">
     <!-- 我的头像和信息 -->
     <view class="my-info">
-      <image class="avatar" src="{{myInfo.avatar || '/images/default-avatar.png'}}" />
+      <view class="avatar avatar-placeholder" wx:if="{{!myInfo.avatar}}">
+        <text class="avatar-text">{{myInfo.name[0] || '我'}}</text>
+      </view>
+      <image class="avatar" src="{{myInfo.avatar}}" wx:if="{{myInfo.avatar}}" />
       <view class="my-details">
         <text class="my-name">{{myInfo.name}}</text>
         <text class="my-score">金币: {{myInfo.coins}}</text>

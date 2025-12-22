@@ -1,2 +1,61 @@
-<!--pages/rank/rank.wxml-->
-<text>pages/rank/rank.wxml</text>
+<!--pages/rank/rank.wxml - 排行榜-->
+<view class="rank-container">
+  <!-- 排行榜类型切换 -->
+  <view class="rank-header">
+    <view class="rank-tab {{rankType === 'wins' ? 'active' : ''}}" bindtap="switchRankType" data-type="wins">
+      <text>胜场榜</text>
+    </view>
+    <view class="rank-tab {{rankType === 'coins' ? 'active' : ''}}" bindtap="switchRankType" data-type="coins">
+      <text>金币榜</text>
+    </view>
+  </view>
+
+  <!-- 前三名 -->
+  <view class="top-three" wx:if="{{rankList.length >= 3}}">
+    <view class="top-item second">
+      <text class="crown">🥈</text>
+      <view class="top-avatar avatar-placeholder">
+        <text>{{rankList[1].nickname[0] || '2'}}</text>
+      </view>
+      <text class="top-name">{{rankList[1].nickname}}</text>
+      <text class="top-score">{{rankList[1].score}}</text>
+    </view>
+    <view class="top-item first">
+      <text class="crown">👑</text>
+      <view class="top-avatar avatar-placeholder">
+        <text>{{rankList[0].nickname[0] || '1'}}</text>
+      </view>
+      <text class="top-name">{{rankList[0].nickname}}</text>
+      <text class="top-score">{{rankList[0].score}}</text>
+    </view>
+    <view class="top-item third">
+      <text class="crown">🥉</text>
+      <view class="top-avatar avatar-placeholder">
+        <text>{{rankList[2].nickname[0] || '3'}}</text>
+      </view>
+      <text class="top-name">{{rankList[2].nickname}}</text>
+      <text class="top-score">{{rankList[2].score}}</text>
+    </view>
+  </view>
+
+  <!-- 排行列表 -->
+  <view class="rank-list" wx:if="{{rankList.length > 3}}">
+    <view class="rank-item" wx:for="{{rankList}}" wx:key="index" wx:if="{{index >= 3}}">
+      <text class="rank-num">{{index + 1}}</text>
+      <view class="rank-avatar avatar-placeholder">
+        <text>{{item.nickname[0] || '#'}}</text>
+      </view>
+      <view class="rank-info">
+        <text class="rank-name">{{item.nickname}}</text>
+        <text class="rank-win-rate">胜率 {{item.winRate || '0%'}}</text>
+      </view>
+      <text class="rank-score">{{item.score}}</text>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{rankList.length === 0}}">
+    <text class="empty-icon">🏆</text>
+    <text class="empty-text">暂无排行数据</text>
+  </view>
+</view>

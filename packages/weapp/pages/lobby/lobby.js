@@ -1,12 +1,12 @@
 /**
- * 大厅页面
+ * 大厅页面 - HTTP API 版本
  */
 const app = getApp();
 
 Page({
   data: {
     userInfo: {},
-    notice: '欢迎来到耀金斗地主！',
+    notice: '欢迎来到要进斗地主！',
     unreadMails: 0,
     pendingTasks: 0,
     
@@ -14,7 +14,7 @@ Page({
     showRoomModal: false,
     roomTab: 'create',
     newRoomName: '',
-    playerCount: 4,
+    playerCount: 3,
     joinRoomId: '',
     roomList: [],
     
@@ -24,11 +24,21 @@ Page({
   },
 
   onLoad() {
-    this.loadUserInfo();
-    this.connectServer();
+    this.checkLogin();
   },
 
   onShow() {
+    this.loadUserInfo();
+  },
+
+  // 检查登录状态
+  checkLogin() {
+    const token = wx.getStorageSync('token');
+    if (!token) {
+      // 未登录，跳转登录页
+      wx.redirectTo({ url: '/pages/login/login' });
+      return;
+    }
     this.loadUserInfo();
   },
 
@@ -44,46 +54,18 @@ Page({
     this.setData({ userInfo });
   },
 
-  // 连接服务器
-  connectServer() {
-    const socket = app.connectSocket();
-    
-    socket.onMessage((res) => {
-      try {
-        const { event, data } = JSON.parse(res.data);
-        this.handleEvent(event, data);
-      } catch (e) {}
-    });
-  },
-
-  // 处理服务器事件
-  handleEvent(event, data) {
-    switch (event) {
-      case 'roomList':
-        this.setData({ roomList: data });
-        break;
-      case 'matchFound':
-        this.setData({ isMatching: false });
-        wx.navigateTo({ url: `/pages/game/game?roomId=${data.roomId}` });
-        break;
-      case 'roomCreated':
-        wx.navigateTo({ url: `/pages/game/game?roomId=${data.roomId}` });
-        break;
-      case 'joinedRoom':
-        wx.navigateTo({ url: `/pages/game/game?roomId=${data.roomId}` });
-        break;
-    }
-  },
-
-  // 快速匹配
+  // 快速匹配 - 直接进入本地游戏
   quickMatch() {
-    this.setData({ isMatching: true, matchTime: 0 });
-    
-    this.matchTimer = setInterval(() => {
-      this.setData({ matchTime: this.data.matchTime + 1 });
-    }, 1000);
-    
-    app.sendMessage('quickMatch', {});
+    // 本地模式：直接进入与机器人对战
+    wx.showModal({
+      title: '快速开始',
+      content: '进入机器人对战模式？',
+      success: (res) => {
+        if (res.confirm) {
+          wx.navigateTo({ url: '/pages/game/game?mode=local' });
+        }
+      }
+    });
   },
 
   // 取消匹配
@@ -92,13 +74,11 @@ Page({
       clearInterval(this.matchTimer);
     }
     this.setData({ isMatching: false });
-    app.sendMessage('cancelMatch', {});
   },
 
   // 显示房间操作
   showRoomActions() {
     this.setData({ showRoomModal: true });
-    app.sendMessage('listRooms', {});
   },
 
   // 关闭房间模态框
@@ -124,15 +104,34 @@ Page({
   // 创建房间
   createRoom() {
     const name = this.data.newRoomName.trim() || `${this.data.userInfo.nickname}的房间`;
-    app.sendMessage('createRoom', {
-      name,
-      maxPlayers: this.data.playerCount
-    });
+    
+    wx.showLoading({ title: '创建中...' });
+    
+    app.createRoom(this.data.playerCount, this.data.userInfo.nickname)
+      .then(result => {
+        wx.hideLoading();
+        this.setData({ showRoomModal: false });
+        wx.navigateTo({ url: `/pages/game/game?roomId=${result.roomId}` });
+      })
+      .catch(err => {
+        wx.hideLoading();
+        // 服务器不可用时进入本地模式
+        wx.showModal({
+          title: '提示',
+          content: '服务器暂时不可用，是否进入本地模式？',
+          success: (res) => {
+            if (res.confirm) {
+              this.setData({ showRoomModal: false });
+              wx.navigateTo({ url: '/pages/game/game?mode=local' });
+            }
+          }
+        });
+      });
   },
 
   // 输入加入房间号
   onJoinRoomInput(e) {
-    this.setData({ joinRoomId: e.detail.value });
+    this.setData({ joinRoomId: e.detail.value.toUpperCase() });
   },
 
   // 加入房间
@@ -141,19 +140,19 @@ Page({
       wx.showToast({ title: '请输入房间号', icon: 'none' });
       return;
     }
-    app.sendMessage('joinRoom', {
-      room: this.data.joinRoomId.trim(),
-      name: this.data.userInfo.nickname
-    });
-  },
-
-  // 通过ID加入房间
-  joinRoomById(e) {
-    const roomId = e.currentTarget.dataset.id;
-    app.sendMessage('joinRoom', {
-      room: roomId,
-      name: this.data.userInfo.nickname
-    });
+    
+    wx.showLoading({ title: '加入中...' });
+    
+    app.joinRoom(this.data.joinRoomId.trim(), this.data.userInfo.nickname)
+      .then(result => {
+        wx.hideLoading();
+        this.setData({ showRoomModal: false });
+        wx.navigateTo({ url: `/pages/game/game?roomId=${result.roomId}` });
+      })
+      .catch(err => {
+        wx.hideLoading();
+        wx.showToast({ title: err.message || '加入失败', icon: 'none' });
+      });
   },
 
   // 比赛场（待开发）
@@ -184,7 +183,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '来耀金斗地主一起玩！',
+      title: '来要进斗地主一起玩！',
       path: '/pages/lobby/lobby'
     };
   }

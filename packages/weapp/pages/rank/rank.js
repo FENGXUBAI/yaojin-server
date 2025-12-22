@@ -1,66 +1,48 @@
-// pages/rank/rank.js
+// pages/rank/rank.js - 排行榜
+const app = getApp();
+
 Page({
-
-  /**
-   * 页面的初始数据
-   */
   data: {
-
+    rankType: 'wins',
+    rankList: []
   },
 
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad(options) {
-
+  onLoad() {
+    this.loadRankList();
   },
 
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady() {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
   onShow() {
-
+    this.loadRankList();
   },
 
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide() {
-
+  // 切换排行榜类型
+  switchRankType(e) {
+    const rankType = e.currentTarget.dataset.type;
+    this.setData({ rankType });
+    this.loadRankList();
   },
 
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload() {
-
+  // 加载排行榜（模拟数据）
+  loadRankList() {
+    // 模拟排行数据
+    const mockData = [
+      { nickname: '牌神', score: 9999, winRate: '85%' },
+      { nickname: '王者归来', score: 8888, winRate: '78%' },
+      { nickname: '斗地主高手', score: 7777, winRate: '72%' },
+      { nickname: '快乐玩家', score: 6666, winRate: '68%' },
+      { nickname: '新手上路', score: 5555, winRate: '55%' },
+      { nickname: '休闲娱乐', score: 4444, winRate: '50%' },
+      { nickname: '天天向上', score: 3333, winRate: '45%' },
+      { nickname: '默默无闻', score: 2222, winRate: '40%' },
+      { nickname: '初出茅庐', score: 1111, winRate: '35%' },
+      { nickname: '菜鸟一只', score: 888, winRate: '30%' }
+    ];
+    
+    this.setData({ rankList: mockData });
   },
 
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
   onPullDownRefresh() {
-
-  },
-
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom() {
-
-  },
-
-  /**
-   * 用户点击右上角分享
-   */
-  onShareAppMessage() {
-
+    this.loadRankList();
+    wx.stopPullDownRefresh();
   }
-})
+});

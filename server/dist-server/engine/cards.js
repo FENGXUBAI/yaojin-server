@@ -18,9 +18,8 @@ const singleOrderMap = new Map(exports.singleOrder.map((r, i) => [r, exports.sin
 exports.straightRing = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const straightRingIndex = new Map(exports.straightRing.map((r, i) => [r, i]));
 function makeCard(rank, suit) {
-    var _a;
     const isJoker = rank === 'JOKER_BIG' || rank === 'JOKER_SMALL';
-    const sortValue = (_a = singleOrderMap.get(rank)) !== null && _a !== void 0 ? _a : 0;
+    const sortValue = singleOrderMap.get(rank) ?? 0;
     return { rank, suit, isJoker, sortValue };
 }
 function createDeck() {
@@ -60,13 +59,11 @@ function formatCard(c) {
     return `${c.suit}${c.rank}`;
 }
 function compareSingleOrGroupByRank(a, b) {
-    var _a, _b;
-    const va = (_a = singleOrderMap.get(a)) !== null && _a !== void 0 ? _a : 0;
-    const vb = (_b = singleOrderMap.get(b)) !== null && _b !== void 0 ? _b : 0;
+    const va = singleOrderMap.get(a) ?? 0;
+    const vb = singleOrderMap.get(b) ?? 0;
     return va - vb; // positive means a > b
 }
 function straightStartValue(seq) {
-    var _a;
     // Special rules: A-2-3 is maximum; Q-K-A is second
     const s = seq[0];
     const isA23 = seq.length >= 3 && seq[0] === 'A' && seq[1] === '2' && seq[2] === '3';
@@ -75,15 +72,14 @@ function straightStartValue(seq) {
         return 1000000;
     if (isQKA)
         return 999000;
-    return ((_a = straightRingIndex.get(s)) !== null && _a !== void 0 ? _a : -100) + seq.length * 0.001; // tie-breaker by length minimal
+    return (straightRingIndex.get(s) ?? -100) + seq.length * 0.001; // tie-breaker by length minimal
 }
 function nextInRing(r) {
-    var _a;
     const i = straightRingIndex.get(r);
     if (i === undefined)
         return null;
     const j = (i + 1);
-    return (_a = exports.straightRing[j]) !== null && _a !== void 0 ? _a : null;
+    return exports.straightRing[j] ?? null;
 }
 function findStraightRuns(ranks) {
     // ranks must be NormalRank strings present in hand (unique)
