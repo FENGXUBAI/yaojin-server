@@ -1,7 +1,8 @@
 node_modules/
 .expo/
-dist/
 npm-debug.log
 yarn-error.log
 .env
 .DS_Store
+# Keep dist-server but ignore other dist folders
+/dist/

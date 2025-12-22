@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>要进 - 在线扑克游戏</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+</head>
+<body>
+  <div id="app">
+    <!-- 加载页面 -->
+    <div id="loading-screen" class="screen active">
+      <div class="loading-content">
+        <div class="logo-container">
+          <h1 class="logo-text">要进</h1>
+          <p class="logo-subtitle">YAOJIN POKER</p>
+        </div>
+        <div class="loading-bar">
+          <div class="loading-progress"></div>
+        </div>
+        <p class="loading-text">正在加载资源...</p>
+      </div>
+    </div>
+
+    <!-- 登录页面 -->
+    <div id="login-screen" class="screen">
+      <div class="login-container">
+        <div class="login-header">
+          <h1 class="logo-text">要进</h1>
+          <p class="tagline">经典扑克，趣味无限</p>
+        </div>
+        <div class="login-form">
+          <div class="form-group">
+            <input type="text" id="nickname-input" placeholder="输入昵称" maxlength="12">
+          </div>
+          <button class="btn btn-primary btn-large" id="quick-start-btn">
+            <span>🎮</span> 快速开始
+          </button>
+          <div class="login-options">
+            <button class="btn btn-secondary" id="create-room-btn">创建房间</button>
+            <button class="btn btn-secondary" id="join-room-btn">加入房间</button>
+          </div>
+        </div>
+        <div class="login-footer">
+          <p>单机版 - 与AI对战</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 大厅页面 -->
+    <div id="lobby-screen" class="screen">
+      <div class="lobby-container">
+        <!-- 顶部栏 -->
+        <header class="lobby-header">
+          <div class="user-info">
+            <div class="avatar">
+              <span id="lobby-avatar">玩</span>
+            </div>
+            <div class="user-details">
+              <span class="username" id="lobby-username">玩家</span>
+              <span class="level">Lv.1</span>
+            </div>
+          </div>
+          <div class="currency-bar">
+            <div class="currency-item">
+              <span class="currency-icon">🪙</span>
+              <span class="currency-value" id="lobby-coins">1000</span>
+            </div>
+          </div>
+          <button class="icon-btn" id="settings-btn">⚙️</button>
+        </header>
+
+        <!-- 主要内容 -->
+        <main class="lobby-main">
+          <!-- 活动横幅 -->
+          <div class="activity-banner">
+            <div class="banner-content">
+              <h3>🎉 每日签到</h3>
+              <p>连续签到赢取丰厚奖励!</p>
+            </div>
+            <button class="btn btn-gold" id="sign-in-btn">签到</button>
+          </div>
+
+          <!-- 游戏模式 -->
+          <section class="game-modes">
+            <div class="mode-card mode-quick" id="mode-quick">
+              <div class="mode-icon">⚡</div>
+              <div class="mode-info">
+                <h3>快速开始</h3>
+                <p>与AI对战</p>
+              </div>
+              <span class="mode-arrow">→</span>
+            </div>
+            <div class="mode-card mode-friend" id="mode-friend">
+              <div class="mode-icon">👥</div>
+              <div class="mode-info">
+                <h3>好友房间</h3>
+                <p>创建或加入房间</p>
+              </div>
+              <span class="mode-arrow">→</span>
+            </div>
+          </section>
+
+          <!-- 功能入口 -->
+          <section class="quick-actions">
+            <button class="action-item" id="action-rank">
+              <span class="action-icon">🏆</span>
+              <span class="action-label">排行榜</span>
+            </button>
+            <button class="action-item" id="action-task">
+              <span class="action-icon">📋</span>
+              <span class="action-label">任务</span>
+              <span class="badge">3</span>
+            </button>
+            <button class="action-item" id="action-shop">
+              <span class="action-icon">🛒</span>
+              <span class="action-label">商城</span>
+            </button>
+            <button class="action-item" id="action-rule">
+              <span class="action-icon">📖</span>
+              <span class="action-label">规则</span>
+            </button>
+          </section>
+        </main>
+
+        <!-- 底部导航 -->
+        <nav class="bottom-nav">
+          <button class="nav-item active" data-page="lobby">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">大厅</span>
+          </button>
+          <button class="nav-item" data-page="rank">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">排行</span>
+          </button>
+          <button class="nav-item" data-page="profile">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">我的</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- 游戏页面 -->
+    <div id="game-screen" class="screen">
+      <div class="game-container">
+        <!-- 背景 -->
+        <div class="game-bg">
+          <div class="table-felt"></div>
+          <div class="table-border"></div>
+        </div>
+
+        <!-- 房间信息 -->
+        <div class="room-header">
+          <div class="room-info">
+            <span class="room-label">房间</span>
+            <span class="room-id" id="game-room-id">LOCAL</span>
+          </div>
+          <div class="multiplier-badge">
+            <span class="multiplier-icon">×</span>
+            <span class="multiplier-value" id="game-multiplier">1</span>
+          </div>
+          <button class="icon-btn" id="game-menu-btn">☰</button>
+        </div>
+
+        <!-- 对手区域 - 上方 -->
+        <div class="opponent-area opponent-top" id="opponent-top">
+          <div class="player-panel">
+            <div class="avatar-wrap">
+              <div class="avatar">A</div>
+              <span class="turn-indicator hidden"></span>
+            </div>
+            <div class="player-details">
+              <span class="player-name">机器人A</span>
+              <span class="card-count">🃏 <span class="count-num">17</span></span>
+            </div>
+          </div>
+          <div class="played-cards hidden"></div>
+          <div class="pass-indicator hidden">不要</div>
+        </div>
+
+        <!-- 对手区域 - 左侧 -->
+        <div class="opponent-area opponent-left" id="opponent-left">
+          <div class="player-panel vertical">
+            <div class="avatar-wrap">
+              <div class="avatar">B</div>
+              <span class="turn-indicator hidden"></span>
+            </div>
+            <div class="player-details">
+              <span class="player-name">机器人B</span>
+              <span class="card-count">🃏 <span class="count-num">17</span></span>
+            </div>
+          </div>
+          <div class="played-cards hidden"></div>
+          <div class="pass-indicator hidden">不要</div>
+        </div>
+
+        <!-- 中央出牌区域 -->
+        <div class="center-area">
+          <div class="center-cards" id="center-cards"></div>
+          <div class="play-label hidden" id="play-label"></div>
+          <div class="table-logo">
+            <span class="logo-text">要进</span>
+          </div>
+        </div>
+
+        <!-- 特效层 -->
+        <div class="effects-layer">
+          <div class="bomb-effect hidden" id="bomb-effect">
+            <div class="bomb-animation">
+              <span class="bomb-text">💥 炸弹!</span>
+            </div>
+            <div class="bomb-particles"></div>
+          </div>
+          <div class="jiefeng-effect hidden" id="jiefeng-effect">
+            <span class="jiefeng-text">🎐 接风!</span>
+          </div>
+        </div>
+
+        <!-- 底部玩家区域 -->
+        <div class="player-bottom-area">
+          <!-- 玩家信息栏 -->
+          <div class="my-info-bar">
+            <div class="my-info">
+              <div class="avatar" id="my-avatar">我</div>
+              <div class="my-details">
+                <span class="my-name" id="my-name">玩家</span>
+                <span class="my-coins">🪙 <span id="my-coins">1000</span></span>
+              </div>
+            </div>
+            <div class="timer-section hidden" id="timer-section">
+              <div class="timer-ring">
+                <span class="timer-text" id="timer-text">30</span>
+              </div>
+              <span class="timer-label">轮到你了</span>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="action-buttons hidden" id="action-buttons">
+            <button class="btn btn-danger" id="btn-pass">不要</button>
+            <button class="btn btn-warning" id="btn-hint">提示</button>
+            <button class="btn btn-success" id="btn-play">出牌</button>
+          </div>
+
+          <!-- 手牌区域 -->
+          <div class="hand-section">
+            <div class="hand-cards" id="hand-cards"></div>
+            <span class="hand-count"><span id="hand-count">20</span> 张</span>
+          </div>
+        </div>
+
+        <!-- 聊天按钮 -->
+        <button class="chat-fab" id="chat-fab">💬</button>
+      </div>
+    </div>
+
+    <!-- 游戏结束弹窗 -->
+    <div class="modal hidden" id="game-over-modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content game-over">
+        <div class="result-header" id="result-header">
+          <span class="result-icon">🏆</span>
+          <h2 class="result-title">胜利!</h2>
+        </div>
+        <div class="score-change" id="score-change">
+          <span class="score-value">+100</span>
+          <span class="score-label">金币</span>
+        </div>
+        <div class="rankings" id="final-rankings"></div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="btn-play-again">再来一局</button>
+          <button class="btn btn-secondary" id="btn-back-lobby">返回大厅</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 房间弹窗 -->
+    <div class="modal hidden" id="room-modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content room-content">
+        <div class="modal-header">
+          <h2>🎮 好友房间</h2>
+          <button class="modal-close" id="room-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="room-tabs">
+            <button class="room-tab active" data-tab="join">加入房间</button>
+            <button class="room-tab" data-tab="create">创建房间</button>
+          </div>
+          
+          <div class="tab-content active" id="tab-join">
+            <div class="input-group">
+              <label>房间号</label>
+              <input type="text" id="room-id-input" placeholder="输入4位房间号" maxlength="4">
+            </div>
+            <div class="input-group">
+              <label>昵称</label>
+              <input type="text" id="room-nick-input" placeholder="输入你的昵称">
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-join-room">加入房间</button>
+          </div>
+          
+          <div class="tab-content" id="tab-create">
+            <div class="input-group">
+              <label>你的昵称</label>
+              <input type="text" id="create-nick-input" placeholder="输入你的昵称">
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-create-room">创建房间</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 等待房间弹窗 -->
+    <div class="modal hidden" id="waiting-modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content waiting-content">
+        <div class="modal-header">
+          <h2>🎲 房间: <span id="waiting-room-id">----</span></h2>
+          <button class="modal-close" id="waiting-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="player-list" id="waiting-players">
+            <!-- 玩家列表动态生成 -->
+          </div>
+          <div class="waiting-status">
+            <p id="waiting-text">等待其他玩家加入...</p>
+            <div class="loading-spinner"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="btn-start-game" disabled>开始游戏</button>
+          <button class="btn btn-secondary btn-block" id="btn-leave-room">离开房间</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 规则弹窗 -->
+    <div class="modal hidden" id="rules-modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content rules-content">
+        <div class="modal-header">
+          <h2>📖 游戏规则</h2>
+          <button class="modal-close" id="rules-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <h3>基本规则</h3>
+          <ul>
+            <li>使用一副54张牌（含大小王）</li>
+            <li>3人或4人游戏</li>
+            <li>目标：尽快出完手中的牌</li>
+          </ul>
+          
+          <h3>牌型说明</h3>
+          <ul>
+            <li><strong>单牌</strong>：任意一张牌</li>
+            <li><strong>对子</strong>：两张相同的牌</li>
+            <li><strong>顺子</strong>：五张或更多连续的牌（不含2和王）</li>
+            <li><strong>连对</strong>：三对或更多连续的对子</li>
+            <li><strong>炸弹</strong>：四张相同的牌</li>
+            <li><strong>轰</strong>：六张相同的牌（更大的炸弹）</li>
+            <li><strong>王炸</strong>：大小王（最大牌型）</li>
+          </ul>
+          
+          <h3>特殊规则</h3>
+          <ul>
+            <li><strong>接风</strong>：当玩家出完牌后，下家获得自由出牌权</li>
+            <li><strong>进贡</strong>：末位玩家需向首位玩家进贡最大的牌</li>
+            <li><strong>起炸</strong>：开局第一手就出炸弹，倍数翻倍</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div class="modal hidden" id="settings-modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content settings-content">
+        <div class="modal-header">
+          <h2>⚙️ 设置</h2>
+          <button class="modal-close" id="settings-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-row">
+            <span class="setting-label">游戏音效</span>
+            <label class="switch">
+              <input type="checkbox" id="sound-toggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">背景音乐</span>
+            <label class="switch">
+              <input type="checkbox" id="music-toggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">震动反馈</span>
+            <label class="switch">
+              <input type="checkbox" id="vibration-toggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 音频元素 -->
+  <audio id="audio-select" src="assets/sounds/select.mp3" preload="auto"></audio>
+  <audio id="audio-play" src="assets/sounds/play.mp3" preload="auto"></audio>
+  <audio id="audio-bomb" src="assets/sounds/sfx_bomb.wav" preload="auto"></audio>
+  <audio id="audio-pass" src="assets/sounds/pass.mp3" preload="auto"></audio>
+  <audio id="audio-win" src="assets/sounds/start.mp3" preload="auto"></audio>
+
+  <!-- Socket.io 客户端 -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  
+  <!-- JavaScript -->
+  <script src="js/utils.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/patterns.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/network.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

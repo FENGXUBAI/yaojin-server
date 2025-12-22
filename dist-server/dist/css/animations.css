@@ -1,0 +1,389 @@
+/* 动画效果 */
+
+/* 卡牌入场动画 */
+@keyframes cardDeal {
+  0% {
+    opacity: 0;
+    transform: translateY(-100px) rotate(20deg) scale(0.5);
+  }
+  60% {
+    transform: translateY(10px) rotate(-5deg) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0) scale(1);
+  }
+}
+
+/* 卡牌选中弹起 */
+@keyframes cardSelect {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+/* 卡牌出牌飞出 */
+@keyframes cardPlay {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0.5);
+  }
+}
+
+/* 出牌区卡牌入场 */
+@keyframes playedCardEnter {
+  0% {
+    opacity: 0;
+    transform: scale(1.5) rotateY(90deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1) rotateY(0);
+  }
+  100% {
+    transform: scale(1) rotateY(0);
+  }
+}
+
+/* 炸弹震动 */
+@keyframes bombShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+  20%, 40%, 60%, 80% { transform: translateX(10px); }
+}
+
+/* 炸弹爆炸 */
+@keyframes bombExplode {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* 金币飞入 */
+@keyframes coinFly {
+  0% {
+    opacity: 0;
+    transform: translateY(-50px) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0) rotate(180deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(50px) rotate(360deg);
+  }
+}
+
+/* 胜利动画 */
+@keyframes victoryPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.1);
+    filter: brightness(1.3);
+  }
+}
+
+/* 失败动画 */
+@keyframes defeatFade {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* 倒计时动画 */
+@keyframes countdown {
+  0% {
+    transform: scale(2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* 头像呼吸指示当前玩家 */
+@keyframes avatarBreath {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 15px rgba(212, 175, 55, 0);
+  }
+}
+
+/* 按钮悬停光效 */
+@keyframes buttonGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.8);
+  }
+}
+
+/* 加载动画 */
+@keyframes loadingSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 淡入 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 淡出 */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* 从左滑入 */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 从右滑入 */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 弹性出现 */
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 粒子效果 */
+@keyframes particle {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 50px), var(--ty, -50px)) scale(0);
+  }
+}
+
+/* 闪烁 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* 彩虹渐变 */
+@keyframes rainbow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 应用动画的类 */
+.animate-card-deal {
+  animation: cardDeal 0.4s ease-out forwards;
+}
+
+.animate-card-select {
+  animation: cardSelect 0.2s ease-out;
+}
+
+.animate-card-play {
+  animation: cardPlay 0.3s ease-out forwards;
+}
+
+.animate-played-enter {
+  animation: playedCardEnter 0.3s ease-out forwards;
+}
+
+.animate-bomb-shake {
+  animation: bombShake 0.5s ease-in-out;
+}
+
+.animate-bomb-explode {
+  animation: bombExplode 0.5s ease-out forwards;
+}
+
+.animate-victory {
+  animation: victoryPulse 1s ease-in-out infinite;
+}
+
+.animate-defeat {
+  animation: defeatFade 2s ease-in-out infinite;
+}
+
+.animate-countdown {
+  animation: countdown 1s ease-out forwards;
+}
+
+.animate-current-turn {
+  animation: avatarBreath 2s ease-in-out infinite;
+}
+
+.animate-button-glow {
+  animation: buttonGlow 1.5s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.5s ease-out forwards;
+}
+
+.animate-blink {
+  animation: blink 1s ease-in-out infinite;
+}
+
+/* 过渡效果 */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+.transition-slow {
+  transition: all 0.5s ease;
+}
+
+/* 悬停效果 */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-glow {
+  transition: box-shadow 0.2s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+}
+
+/* 粒子容器 */
+.particle-container {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: gold;
+  animation: particle 1s ease-out forwards;
+}
+
+/* 烟花效果 */
+.firework {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+@keyframes firework {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y));
+  }
+}
