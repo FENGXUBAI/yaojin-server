@@ -411,8 +411,11 @@ const App = {
    * 渲染玩家手牌
    */
   renderHand() {
-    const container = document.querySelector('.player-hand .cards');
-    if (!container) return;
+    const container = document.getElementById('hand-cards');
+    if (!container) {
+      console.error('hand-cards container not found');
+      return;
+    }
     
     container.innerHTML = '';
     
@@ -431,6 +434,10 @@ const App = {
       
       container.appendChild(cardEl);
     });
+    
+    // 更新手牌数量
+    const countEl = document.getElementById('hand-count');
+    if (countEl) countEl.textContent = hand.length;
   },
   
   /**
@@ -439,34 +446,24 @@ const App = {
   renderOpponents() {
     const state = Game.state;
     
-    // 左边对手 (玩家1)
-    const leftCards = document.querySelector('.opponent.left .opponent-cards');
-    const leftCount = document.querySelector('.opponent.left .card-count');
-    if (leftCards && leftCount) {
-      leftCards.innerHTML = '';
+    // 上方对手 (玩家1 - 机器人A)
+    const topArea = document.getElementById('opponent-top');
+    if (topArea) {
       const count1 = state.players[1].hand.length;
-      leftCount.textContent = count1;
-      
-      for (let i = 0; i < Math.min(count1, 6); i++) {
-        const back = document.createElement('div');
-        back.className = 'card card-back';
-        leftCards.appendChild(back);
-      }
+      const countEl = topArea.querySelector('.count-num');
+      if (countEl) countEl.textContent = count1;
+      const nameEl = topArea.querySelector('.player-name');
+      if (nameEl) nameEl.textContent = state.players[1].name;
     }
     
-    // 右边对手 (玩家2)
-    const rightCards = document.querySelector('.opponent.right .opponent-cards');
-    const rightCount = document.querySelector('.opponent.right .card-count');
-    if (rightCards && rightCount) {
-      rightCards.innerHTML = '';
+    // 左边对手 (玩家2 - 机器人B)
+    const leftArea = document.getElementById('opponent-left');
+    if (leftArea) {
       const count2 = state.players[2].hand.length;
-      rightCount.textContent = count2;
-      
-      for (let i = 0; i < Math.min(count2, 6); i++) {
-        const back = document.createElement('div');
-        back.className = 'card card-back';
-        rightCards.appendChild(back);
-      }
+      const countEl = leftArea.querySelector('.count-num');
+      if (countEl) countEl.textContent = count2;
+      const nameEl = leftArea.querySelector('.player-name');
+      if (nameEl) nameEl.textContent = state.players[2].name;
     }
   },
   
@@ -474,8 +471,11 @@ const App = {
    * 渲染出牌区
    */
   renderPlayArea() {
-    const container = document.querySelector('.play-area .played-cards');
-    if (!container) return;
+    const container = document.getElementById('center-cards');
+    if (!container) {
+      console.error('center-cards container not found');
+      return;
+    }
     
     container.innerHTML = '';
     
@@ -489,17 +489,22 @@ const App = {
       });
     }
     
-    // 显示上家信息
-    const info = document.querySelector('.play-area .last-player-info');
-    if (info) {
+    // 显示出牌标签
+    const label = document.getElementById('play-label');
+    if (label) {
       if (Game.state.lastPlay && Game.state.lastPlayIndex >= 0) {
         const playerName = Game.state.players[Game.state.lastPlayIndex].name;
         const typeName = Patterns.getTypeName(Game.state.lastPlay.type);
-        info.textContent = `${playerName}: ${typeName}`;
+        label.textContent = `${playerName}: ${typeName}`;
+        label.classList.remove('hidden');
       } else {
-        info.textContent = '';
+        label.classList.add('hidden');
       }
     }
+    
+    // 更新倍数
+    const multiplierEl = document.getElementById('game-multiplier');
+    if (multiplierEl) multiplierEl.textContent = Game.state.multiplier;
   },
   
   /**
@@ -509,9 +514,19 @@ const App = {
     const isMyTurn = Game.state.currentPlayer === 0;
     const canPass = Game.state.lastPlayIndex !== -1 && Game.state.lastPlayIndex !== 0;
     
-    const playBtn = document.getElementById('playBtn');
-    const passBtn = document.getElementById('passBtn');
-    const hintBtn = document.getElementById('hintBtn');
+    const actionBtns = document.getElementById('action-buttons');
+    const playBtn = document.getElementById('btn-play');
+    const passBtn = document.getElementById('btn-pass');
+    const hintBtn = document.getElementById('btn-hint');
+    
+    // 显示/隐藏操作按钮
+    if (actionBtns) {
+      if (isMyTurn) {
+        actionBtns.classList.remove('hidden');
+      } else {
+        actionBtns.classList.add('hidden');
+      }
+    }
     
     if (playBtn) {
       playBtn.disabled = !isMyTurn || Game.selectedCards.size === 0;
@@ -524,6 +539,16 @@ const App = {
     if (hintBtn) {
       hintBtn.disabled = !isMyTurn;
     }
+    
+    // 更新计时器显示
+    const timerSection = document.getElementById('timer-section');
+    if (timerSection) {
+      if (isMyTurn) {
+        timerSection.classList.remove('hidden');
+      } else {
+        timerSection.classList.add('hidden');
+      }
+    }
   },
   
   /**
@@ -533,18 +558,23 @@ const App = {
     const currentIdx = Game.state.currentPlayer;
     
     // 移除所有active
-    document.querySelectorAll('.opponent').forEach(el => {
+    document.querySelectorAll('.opponent-area').forEach(el => {
       el.classList.remove('current-turn');
+      el.querySelector('.turn-indicator')?.classList.add('hidden');
     });
-    document.querySelector('.player-area')?.classList.remove('current-turn');
+    document.querySelector('.player-bottom-area')?.classList.remove('current-turn');
     
     // 添加当前玩家标识
     if (currentIdx === 0) {
-      document.querySelector('.player-area')?.classList.add('current-turn');
+      document.querySelector('.player-bottom-area')?.classList.add('current-turn');
     } else if (currentIdx === 1) {
-      document.querySelector('.opponent.left')?.classList.add('current-turn');
+      const area = document.getElementById('opponent-top');
+      area?.classList.add('current-turn');
+      area?.querySelector('.turn-indicator')?.classList.remove('hidden');
     } else {
-      document.querySelector('.opponent.right')?.classList.add('current-turn');
+      const area = document.getElementById('opponent-left');
+      area?.classList.add('current-turn');
+      area?.querySelector('.turn-indicator')?.classList.remove('hidden');
     }
   },
   
