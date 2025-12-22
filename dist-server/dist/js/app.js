@@ -59,22 +59,28 @@ const App = {
    * 绑定事件
    */
   bindEvents() {
-    // 登录
-    document.getElementById('loginBtn')?.addEventListener('click', () => {
-      this.login();
+    // 登录页 - 快速开始
+    document.getElementById('quick-start-btn')?.addEventListener('click', () => {
+      this.quickStartFromLogin();
     });
     
-    document.getElementById('guestBtn')?.addEventListener('click', () => {
-      this.guestLogin();
+    // 登录页 - 创建房间
+    document.getElementById('create-room-btn')?.addEventListener('click', () => {
+      this.showRoomModal('create');
+    });
+    
+    // 登录页 - 加入房间
+    document.getElementById('join-room-btn')?.addEventListener('click', () => {
+      this.showRoomModal('join');
     });
     
     // 大厅 - 快速开始（单机）
-    document.querySelector('.mode-card.quick-start')?.addEventListener('click', () => {
+    document.getElementById('mode-quick')?.addEventListener('click', () => {
       this.startGame();
     });
     
     // 大厅 - 好友房间（联机）
-    document.querySelector('.mode-card.friend-room')?.addEventListener('click', () => {
+    document.getElementById('mode-friend')?.addEventListener('click', () => {
       this.showModal('room-modal');
     });
     
@@ -297,6 +303,62 @@ const App = {
     this.updateUserUI();
     this.showScreen('lobby');
     Sound.play('click');
+  },
+  
+  /**
+   * 从登录页快速开始
+   */
+  quickStartFromLogin() {
+    const nicknameInput = document.getElementById('nickname-input');
+    const nickname = nicknameInput?.value?.trim() || '玩家' + Math.floor(Math.random() * 10000);
+    
+    this.user = {
+      id: Utils.generateId(),
+      name: nickname,
+      level: 1,
+      coins: 1000,
+      exp: 0,
+      wins: 0,
+      losses: 0
+    };
+    
+    this.saveUser();
+    this.updateUserUI();
+    Sound.play('click');
+    
+    // 直接开始游戏
+    this.startGame();
+  },
+  
+  /**
+   * 显示房间模态框
+   */
+  showRoomModal(mode) {
+    const nicknameInput = document.getElementById('nickname-input');
+    const nickname = nicknameInput?.value?.trim() || '玩家' + Math.floor(Math.random() * 10000);
+    
+    this.user = {
+      id: Utils.generateId(),
+      name: nickname,
+      level: 1,
+      coins: 1000,
+      exp: 0,
+      wins: 0,
+      losses: 0
+    };
+    
+    this.saveUser();
+    this.updateUserUI();
+    
+    // 显示房间模态框
+    this.showModal('room-modal');
+    
+    // 切换到对应标签
+    if (mode === 'create') {
+      document.querySelector('.room-tab[data-tab="create"]')?.click();
+    } else if (mode === 'join') {
+      document.querySelector('.room-tab[data-tab="join"]')?.click();
+    }
   },
   
   /**
