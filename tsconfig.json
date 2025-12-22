@@ -1,28 +1,25 @@
 {
   "compilerOptions": {
-    "target": "es2019",
-    "module": "esnext",
-    "jsx": "react-jsx",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "lib": ["ES2020"],
+    "outDir": "./dist-server",
+    "rootDir": ".",
     "strict": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "skipLibCheck": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "@engine/*": [
-        "src/engine/*"
-      ]
-    }
+    "declaration": false,
+    "moduleResolution": "node"
   },
   "include": [
-    "src",
-    "App.tsx"
+    "index.ts",
+    "engine/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
-  ],
-  "extends": "expo/tsconfig.base"
+    "node_modules",
+    "dist",
+    "dist-server"
+  ]
 }
