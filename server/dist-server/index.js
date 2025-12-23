@@ -286,7 +286,21 @@ app.get('/api/room/:roomId', (req, res) => {
 // ============== 静态文件服务 ==============
 // Serve static files from the React Native Web build
 // Disable caching to avoid clients getting stale JS bundles after redeploy.
-const distPath = path_1.default.join(__dirname, 'dist');
+let distPath = path_1.default.join(__dirname, 'dist');
+if (!require('fs').existsSync(distPath)) {
+    // Try finding 'web' folder relative to current location
+    // If running from dist-server: ../../web
+    const webPath1 = path_1.default.join(__dirname, '../../web');
+    // If running from server root: ../web
+    const webPath2 = path_1.default.join(__dirname, '../web');
+    if (require('fs').existsSync(webPath1)) {
+        distPath = webPath1;
+    }
+    else if (require('fs').existsSync(webPath2)) {
+        distPath = webPath2;
+    }
+}
+console.log('Serving static files from:', distPath);
 app.use(express_1.default.static(distPath, {
     etag: false,
     lastModified: false,

@@ -8,32 +8,21 @@ const App = {
   // 用户信息
   user: null,
   
-  // 当前提示索引
-  hintIndex: 0,
-  hints: [],
-  
-  // 联机模式
+  // 游戏状态
   isOnline: false,
-  roomPlayers: [],
-  myHand: [],
-  myIndex: -1,
-  gameState: null,
   
   /**
    * 初始化应用
    */
   init() {
     // 初始化音效
-    Sound.init();
+    if (window.Sound) Sound.init();
     
     // 绑定事件
     this.bindEvents();
     
     // 加载用户信息
     this.loadUser();
-    
-    // 设置网络事件
-    this.setupNetworkEvents();
     
     // 模拟加载
     setTimeout(() => {
@@ -42,847 +31,326 @@ const App = {
   },
   
   /**
-   * 设置网络事件
-   */
-  setupNetworkEvents() {
-    Network.on('roomState', (state) => this.onRoomState(state));
-    Network.on('roomUpdate', (state) => this.onRoomState(state));
-    Network.on('privateState', (state) => this.onPrivateState(state));
-    Network.on('gameState', (state) => this.onGameState(state));
-    Network.on('turnResult', (result) => this.onTurnResult(result));
-    Network.on('gameOver', (result) => this.onGameOver(result));
-    Network.on('error', (err) => this.onNetworkError(err));
-    Network.on('disconnected', () => this.onDisconnected());
-  },
-  
-  /**
    * 绑定事件
    */
   bindEvents() {
-    // 登录页 - 快速开始
-    document.getElementById('quick-start-btn')?.addEventListener('click', () => {
-      this.quickStartFromLogin();
+    // --- 登录页 ---
+    this.bindClick('quick-start-btn', () => this.quickStart());
+    this.bindClick('create-room-btn', () => this.showRoomModal('create'));
+    this.bindClick('join-room-btn', () => this.showRoomModal('join'));
+    
+    // --- 大厅页 ---
+    this.bindClick('mode-quick', () => this.startGame('local'));
+    this.bindClick('mode-friend', () => this.showRoomModal('create')); // 暂时都弹窗
+    this.bindClick('settings-btn', () => this.showNotification('设置功能开发中...'));
+    
+    // --- 游戏页 ---
+    this.bindClick('exit-game-btn', () => this.confirmExit());
+    this.bindClick('game-settings-btn', () => this.showNotification('设置功能开发中...'));
+    
+    // 游戏操作
+    this.bindClick('btn-play', () => this.playCards());
+    this.bindClick('btn-pass', () => this.pass());
+    this.bindClick('btn-hint', () => this.hint());
+    this.bindClick('btn-prepare', () => this.prepare());
+    
+    // --- 弹窗 ---
+    this.bindClick('close-room-modal', () => this.hideModal('room-modal'));
+    this.bindClick('confirm-create-btn', () => this.createRoom());
+    this.bindClick('confirm-join-btn', () => this.joinRoom());
+    this.bindClick('result-confirm-btn', () => {
+      this.hideModal('result-modal');
+      this.prepare();
     });
     
-    // 登录页 - 创建房间
-    document.getElementById('create-room-btn')?.addEventListener('click', () => {
-      this.showRoomModal('create');
-    });
-    
-    // 登录页 - 加入房间
-    document.getElementById('join-room-btn')?.addEventListener('click', () => {
-      this.showRoomModal('join');
-    });
-    
-    // 大厅 - 快速开始（单机）
-    document.getElementById('mode-quick')?.addEventListener('click', () => {
-      this.startGame();
-    });
-    
-    // 大厅 - 好友房间（联机）
-    document.getElementById('mode-friend')?.addEventListener('click', () => {
-      this.showModal('room-modal');
-    });
-    
-    // 游戏控制
-    document.getElementById('btn-play')?.addEventListener('click', () => {
-      this.playCards();
-    });
-    
-    document.getElementById('btn-pass')?.addEventListener('click', () => {
-      this.pass();
-    });
-    
-    document.getElementById('btn-hint')?.addEventListener('click', () => {
-      this.hint();
-    });
-    
-    // 模态框关闭
-    document.querySelectorAll('.modal-close, .modal-overlay').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-close')) {
-          this.closeAllModals();
-        }
-      });
-    });
-    
-    // 阻止模态框内容区域点击冒泡
-    document.querySelectorAll('.modal-content').forEach(el => {
-      el.addEventListener('click', e => e.stopPropagation());
-    });
-    
-    // 房间标签切换
-    document.querySelectorAll('.room-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.room-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        tab.classList.add('active');
-        const tabId = 'tab-' + tab.dataset.tab;
-        document.getElementById(tabId)?.classList.add('active');
-      });
-    });
-    
-    // 加入房间
-    document.getElementById('btn-join-room')?.addEventListener('click', () => {
-      this.joinRoom();
-    });
-    
-    // 创建房间
-    document.getElementById('btn-create-room')?.addEventListener('click', () => {
-      this.createRoom();
-    });
-    
-    // 开始游戏（房主）
-    document.getElementById('btn-start-game')?.addEventListener('click', () => {
-      this.startOnlineGame();
-    });
-    
-    // 离开房间
-    document.getElementById('btn-leave-room')?.addEventListener('click', () => {
-      this.leaveRoom();
-    });
-    
-    // 游戏结束弹窗
-    document.getElementById('btn-play-again')?.addEventListener('click', () => {
-      this.closeAllModals();
-      if (this.isOnline) {
-        // 联机模式等待下一局
-      } else {
-        this.startGame();
-      }
-    });
-    
-    document.getElementById('btn-back-lobby')?.addEventListener('click', () => {
-      this.closeAllModals();
-      if (this.isOnline) {
-        this.leaveRoom();
-      }
-      this.showScreen('lobby');
-    });
-    
-    // 规则按钮
-    document.getElementById('action-rule')?.addEventListener('click', () => {
-      this.showModal('rules-modal');
-    });
-    
-    // 导航
-    document.querySelectorAll('.nav-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const target = item.dataset.page;
-        if (target) {
-          document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-          item.classList.add('active');
-        }
+    // 房间弹窗Tab切换
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tab = e.target.dataset.tab;
+        this.switchRoomTab(tab);
       });
     });
   },
   
+  bindClick(id, handler) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('click', handler);
+    }
+  },
+  
   /**
-   * 显示屏幕
+   * 切换屏幕
    */
   showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(screen => {
-      screen.classList.remove('active');
+    // 隐藏所有屏幕
+    document.querySelectorAll('.screen').forEach(el => {
+      el.classList.remove('active');
     });
     
-    const screen = document.getElementById(screenId + '-screen');
-    if (screen) {
-      screen.classList.add('active');
+    // 显示目标屏幕
+    const target = document.getElementById(`${screenId}-screen`);
+    if (target) {
+      target.classList.add('active');
       this.currentScreen = screenId;
     }
     
-    // 显示/隐藏导航
-    const nav = document.querySelector('.nav');
-    if (nav) {
-      nav.style.display = (screenId === 'lobby' || screenId === 'profile') ? 'flex' : 'none';
+    // 如果是大厅，更新用户信息
+    if (screenId === 'lobby') {
+      this.updateLobbyUI();
     }
-  },
-  
-  /**
-   * 显示模态框
-   */
-  showModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      modal.classList.add('active');
-    }
-  },
-  
-  /**
-   * 关闭所有模态框
-   */
-  closeAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-      modal.classList.remove('active');
-    });
   },
   
   /**
    * 加载用户
    */
   loadUser() {
-    const saved = Utils.getStorage('user');
+    const saved = localStorage.getItem('yaojin_user');
     if (saved) {
-      this.user = saved;
-      this.updateUserUI();
+      try {
+        this.user = JSON.parse(saved);
+      } catch (e) {
+        console.error('Load user failed', e);
+      }
     }
   },
   
-  /**
-   * 保存用户
-   */
   saveUser() {
     if (this.user) {
-      Utils.setStorage('user', this.user);
+      localStorage.setItem('yaojin_user', JSON.stringify(this.user));
     }
   },
   
   /**
-   * 更新用户界面
+   * 快速开始 (登录页)
    */
-  updateUserUI() {
+  quickStart() {
+    const input = document.getElementById('nickname-input');
+    const name = input.value.trim() || '玩家' + Math.floor(Math.random() * 1000);
+    
+    this.user = {
+      id: Date.now().toString(),
+      name: name,
+      coins: 1000
+    };
+    this.saveUser();
+    this.showScreen('lobby');
+  },
+  
+  /**
+   * 更新大厅UI
+   */
+  updateLobbyUI() {
     if (!this.user) return;
-    
-    // 更新大厅用户信息
-    document.querySelectorAll('.user-name').forEach(el => {
-      el.textContent = this.user.name;
-    });
-    
-    document.querySelectorAll('.user-coins').forEach(el => {
-      el.textContent = this.user.coins;
-    });
-    
-    document.querySelectorAll('.user-level').forEach(el => {
-      el.textContent = `Lv.${this.user.level}`;
-    });
+    document.getElementById('lobby-username').textContent = this.user.name;
+    document.getElementById('lobby-userid').textContent = `ID: ${this.user.id.slice(-6)}`;
+    document.getElementById('lobby-avatar').textContent = this.user.name[0];
   },
   
   /**
-   * 登录
+   * 显示房间弹窗
    */
-  login() {
-    const nicknameInput = document.querySelector('#loginScreen input[type="text"]');
-    const nickname = nicknameInput?.value?.trim();
-    
-    if (!nickname) {
-      alert('请输入昵称');
-      return;
-    }
-    
-    this.user = {
-      id: Utils.generateId(),
-      name: nickname,
-      level: 1,
-      coins: 1000,
-      exp: 0,
-      wins: 0,
-      losses: 0
-    };
-    
-    this.saveUser();
-    this.updateUserUI();
-    this.showScreen('lobby');
-    Sound.play('click');
-  },
-  
-  /**
-   * 游客登录
-   */
-  guestLogin() {
-    this.user = {
-      id: Utils.generateId(),
-      name: '游客' + Math.floor(Math.random() * 10000),
-      level: 1,
-      coins: 500,
-      exp: 0,
-      wins: 0,
-      losses: 0
-    };
-    
-    this.saveUser();
-    this.updateUserUI();
-    this.showScreen('lobby');
-    Sound.play('click');
-  },
-  
-  /**
-   * 从登录页快速开始
-   */
-  quickStartFromLogin() {
-    const nicknameInput = document.getElementById('nickname-input');
-    const nickname = nicknameInput?.value?.trim() || '玩家' + Math.floor(Math.random() * 10000);
-    
-    this.user = {
-      id: Utils.generateId(),
-      name: nickname,
-      level: 1,
-      coins: 1000,
-      exp: 0,
-      wins: 0,
-      losses: 0
-    };
-    
-    this.saveUser();
-    this.updateUserUI();
-    Sound.play('click');
-    
-    // 直接开始游戏
-    this.startGame();
-  },
-  
-  /**
-   * 显示房间模态框
-   */
-  showRoomModal(mode) {
-    const nicknameInput = document.getElementById('nickname-input');
-    const nickname = nicknameInput?.value?.trim() || '玩家' + Math.floor(Math.random() * 10000);
-    
-    this.user = {
-      id: Utils.generateId(),
-      name: nickname,
-      level: 1,
-      coins: 1000,
-      exp: 0,
-      wins: 0,
-      losses: 0
-    };
-    
-    this.saveUser();
-    this.updateUserUI();
-    
-    // 显示房间模态框
+  showRoomModal(tab) {
     this.showModal('room-modal');
+    this.switchRoomTab(tab);
+  },
+  
+  switchRoomTab(tab) {
+    // 更新按钮状态
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
     
-    // 切换到对应标签
-    if (mode === 'create') {
-      document.querySelector('.room-tab[data-tab="create"]')?.click();
-    } else if (mode === 'join') {
-      document.querySelector('.room-tab[data-tab="join"]')?.click();
-    }
+    // 更新内容显示
+    document.getElementById('create-room-form').classList.toggle('active', tab === 'create');
+    document.getElementById('join-room-form').classList.toggle('active', tab === 'join');
   },
   
   /**
    * 开始游戏
    */
-  startGame() {
-    Sound.play('click');
+  startGame(mode) {
+    this.isOnline = (mode === 'online');
     this.showScreen('game');
     
-    // 初始化游戏
-    Game.init(this.user?.name || '玩家');
+    // 初始化游戏逻辑
+    Game.init(this.user.name);
     
-    // 检查是否有进贡阶段
-    if (Game.state.tributePhase) {
-      this.showTributePhase();
-    } else {
-      // 渲染界面
-      this.renderGame();
-      
-      // 如果不是玩家回合，触发AI
-      if (Game.state.currentPlayer !== 0) {
-        this.runAI();
-      } else {
-        Sound.play('my_turn');
-      }
-    }
-  },
-  
-  /**
-   * 显示进贡阶段界面
-   */
-  showTributePhase() {
-    const phase = Game.state.tributePhase;
-    if (!phase) return;
-    
-    // 先渲染基本界面
+    // 渲染初始界面
     this.renderGame();
     
-    if (phase.type === 'pay' && phase.payFrom === 0) {
-      // 玩家需要进贡
-      this.showNotification('请选择最大的牌进贡', 5000);
-      
-      // 更新按钮为进贡模式
-      const playBtn = document.getElementById('btn-play');
-      const passBtn = document.getElementById('btn-pass');
-      
-      if (playBtn) {
-        playBtn.textContent = '进贡';
-        playBtn.onclick = () => this.doPayTribute();
-      }
-      if (passBtn) {
-        passBtn.classList.add('hidden');
-      }
-    } else if (phase.type === 'return' && phase.returnFrom === 0) {
-      // 玩家需要回贡
-      this.showNotification(`你收到了进贡牌 ${Cards.formatCard(phase.tributeCard)}，请选择一张牌回贡`, 5000);
-      
-      // 更新按钮为回贡模式
-      const playBtn = document.getElementById('btn-play');
-      const passBtn = document.getElementById('btn-pass');
-      
-      if (playBtn) {
-        playBtn.textContent = '回贡';
-        playBtn.onclick = () => this.doReturnTribute();
-      }
-      if (passBtn) {
-        passBtn.classList.add('hidden');
-      }
-    } else {
-      // AI已自动处理
-      this.showNotification('进贡回贡完成', 2000);
-      
-      // 如果不是玩家回合，触发AI
-      if (Game.state.currentPlayer !== 0) {
-        this.runAI();
-      } else {
-        Sound.play('my_turn');
-      }
-    }
-  },
-  
-  /**
-   * 执行进贡
-   */
-  doPayTribute() {
-    const selected = Array.from(Game.selectedCards);
-    if (selected.length !== 1) {
-      this.showNotification('请选择一张牌进贡', 2000);
-      return;
-    }
-    
-    const result = Game.payTribute(selected[0]);
-    if (!result.success) {
-      this.showNotification(result.message, 2000);
-      return;
-    }
-    
-    Sound.play('card_play');
-    this.showNotification('进贡成功', 1500);
-    
-    // 检查是否进入回贡阶段
-    if (Game.state.tributePhase && Game.state.tributePhase.type === 'return') {
-      this.showTributePhase();
-    } else {
-      // 恢复正常按钮
-      this.resetButtons();
-      this.renderGame();
-      
-      // 如果不是玩家回合，触发AI
-      if (Game.state.currentPlayer !== 0) {
-        this.runAI();
-      } else {
-        Sound.play('my_turn');
-      }
-    }
-  },
-  
-  /**
-   * 执行回贡
-   */
-  doReturnTribute() {
-    const selected = Array.from(Game.selectedCards);
-    if (selected.length !== 1) {
-      this.showNotification('请选择一张牌回贡', 2000);
-      return;
-    }
-    
-    const result = Game.returnTribute(selected[0]);
-    if (!result.success) {
-      this.showNotification(result.message, 2000);
-      return;
-    }
-    
-    Sound.play('card_play');
-    this.showNotification('回贡成功', 1500);
-    
-    // 恢复正常按钮
-    this.resetButtons();
-    
-    // 重新渲染
-    this.renderGame();
-    
-    // 如果不是玩家回合，触发AI
+    // 如果不是玩家先手，触发AI
     if (Game.state.currentPlayer !== 0) {
       this.runAI();
     } else {
-      Sound.play('my_turn');
+      this.showNotification('轮到你了');
     }
   },
   
   /**
-   * 重置按钮状态
-   */
-  resetButtons() {
-    const playBtn = document.getElementById('btn-play');
-    const passBtn = document.getElementById('btn-pass');
-    
-    if (playBtn) {
-      playBtn.textContent = '出牌';
-      playBtn.onclick = () => this.playCards();
-    }
-    if (passBtn) {
-      passBtn.classList.remove('hidden');
-    }
-  },
-  
-  /**
-   * 渲染游戏界面
+   * 渲染游戏界面 (核心)
    */
   renderGame() {
     const state = Game.state;
+    if (!state) return;
     
-    // 渲染玩家手牌
+    // 1. 渲染手牌
     this.renderHand();
     
-    // 渲染对手牌数
+    // 2. 渲染对手信息
     this.renderOpponents();
     
-    // 渲染出牌区
+    // 3. 渲染出牌区
     this.renderPlayArea();
     
-    // 更新按钮状态
+    // 4. 更新按钮状态
     this.updateButtons();
     
-    // 更新当前玩家指示
-    this.updateTurnIndicator();
+    // 5. 更新自身信息
+    document.getElementById('my-name').textContent = this.user.name;
+    document.getElementById('my-score').textContent = `💰 ${this.user.coins}`;
+    document.getElementById('my-avatar').textContent = this.user.name[0];
   },
   
   /**
-   * 渲染玩家手牌
+   * 渲染手牌
    */
   renderHand() {
     const container = document.getElementById('hand-cards');
-    if (!container) {
-      console.error('hand-cards container not found');
-      return;
-    }
-    
-    // 如果是第一次渲染（或者手牌数量变化很大，比如刚发牌），使用动画
-    // 这里简单判断：如果容器为空，则使用发牌动画
-    if (container.children.length === 0 && Game.state.players[0].hand.length > 0) {
-      this.animateDeal(container);
-      return;
-    }
-    
     container.innerHTML = '';
     
     const hand = Game.state.players[0].hand;
     hand.forEach((card, index) => {
-      const cardEl = Cards.createCardElement(card);
-      // cardEl.style.animationDelay = `${index * 0.03}s`; // 移除默认CSS动画延迟，由JS控制
+      const el = Cards.createCardElement(card, index);
       
+      // 选中状态
       if (Game.selectedCards.has(card.id)) {
-        cardEl.classList.add('selected');
+        el.classList.add('selected');
       }
       
-      cardEl.addEventListener('click', () => {
-        this.onCardClick(card);
-      });
+      // 点击事件
+      el.addEventListener('click', () => this.onCardClick(card));
       
-      container.appendChild(cardEl);
+      container.appendChild(el);
     });
-    
-    // 更新手牌数量
-    const countEl = document.getElementById('hand-count');
-    if (countEl) countEl.textContent = hand.length;
-  },
-  
-  /**
-   * 发牌动画
-   */
-  animateDeal(container) {
-    container.innerHTML = '';
-    const hand = Game.state.players[0].hand;
-    
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i >= hand.length) {
-        clearInterval(interval);
-        // 动画结束后，重新绑定事件等（虽然这里已经绑定了）
-        return;
-      }
-      
-      const card = hand[i];
-      const cardEl = Cards.createCardElement(card);
-      cardEl.classList.add('dealing'); // 可以添加一个特殊的动画类
-      
-      if (Game.selectedCards.has(card.id)) {
-        cardEl.classList.add('selected');
-      }
-      
-      cardEl.addEventListener('click', () => {
-        this.onCardClick(card);
-      });
-      
-      container.appendChild(cardEl);
-      
-      // 播放发牌音效
-      if (i % 2 === 0) { // 每两张播放一次，避免太吵
-        Sound.play('deal'); 
-      }
-      
-      i++;
-    }, 100); // 每100ms发一张
   },
   
   /**
    * 渲染对手
    */
   renderOpponents() {
-    const state = Game.state;
+    const players = Game.state.players;
     
-    // 上方对手 (玩家1 - 机器人A)
-    const topArea = document.getElementById('opponent-top');
-    if (topArea) {
-      const count1 = state.players[1].hand.length;
-      const countEl = topArea.querySelector('.count-num');
-      if (countEl) countEl.textContent = count1;
-      const nameEl = topArea.querySelector('.player-name');
-      if (nameEl) nameEl.textContent = state.players[1].name;
-    }
+    // 机器人A (Top) - Index 1
+    this.updateOpponentUI('top', players[1]);
     
-    // 左边对手 (玩家2 - 机器人B)
-    const leftArea = document.getElementById('opponent-left');
-    if (leftArea) {
-      const count2 = state.players[2].hand.length;
-      const countEl = leftArea.querySelector('.count-num');
-      if (countEl) countEl.textContent = count2;
-      const nameEl = leftArea.querySelector('.player-name');
-      if (nameEl) nameEl.textContent = state.players[2].name;
-    }
+    // 机器人B (Left) - Index 2
+    this.updateOpponentUI('left', players[2]);
+    
+    // 如果有第四人...
+  },
+  
+  updateOpponentUI(position, player) {
+    const el = document.getElementById(`opponent-${position}`);
+    if (!el || !player) return;
+    
+    el.querySelector('.name').textContent = player.name;
+    el.querySelector('.card-count-badge').textContent = player.hand.length;
+    
+    // 高亮当前出牌者
+    const isCurrent = Game.state.players.indexOf(player) === Game.state.currentPlayer;
+    el.querySelector('.turn-indicator').classList.toggle('hidden', !isCurrent);
   },
   
   /**
    * 渲染出牌区
    */
   renderPlayArea() {
-    const container = document.getElementById('center-cards');
-    if (!container) {
-      console.error('center-cards container not found');
-      return;
-    }
+    // 清空所有出牌区
+    ['self', 'top', 'left', 'right'].forEach(pos => {
+      const el = document.getElementById(`last-played-${pos}`);
+      if (el) el.innerHTML = '';
+    });
     
-    container.innerHTML = '';
-    
-    if (Game.state.lastPlay) {
-      const cards = Game.state.lastPlay.cards;
-      cards.forEach((card, index) => {
-        const cardEl = Cards.createCardElement(card);
-        cardEl.classList.add('played');
-        cardEl.style.animationDelay = `${index * 0.05}s`;
-        container.appendChild(cardEl);
-      });
-    }
-    
-    // 显示出牌标签
-    const label = document.getElementById('play-label');
-    if (label) {
-      if (Game.state.lastPlay && Game.state.lastPlayIndex >= 0) {
-        const playerName = Game.state.players[Game.state.lastPlayIndex].name;
-        const typeName = Patterns.getTypeName(Game.state.lastPlay.type);
-        label.textContent = `${playerName}: ${typeName}`;
-        label.classList.remove('hidden');
-      } else {
-        label.classList.add('hidden');
+    // 显示最后出的牌
+    if (Game.state.lastPlay && Game.state.lastPlayIndex !== -1) {
+      const idx = Game.state.lastPlayIndex;
+      let pos = 'self';
+      if (idx === 1) pos = 'top';
+      if (idx === 2) pos = 'left';
+      
+      const container = document.getElementById(`last-played-${pos}`);
+      if (container) {
+        Game.state.lastPlay.cards.forEach(card => {
+          container.appendChild(Cards.createCardElement(card));
+        });
       }
     }
-    
-    // 更新倍数
-    const multiplierEl = document.getElementById('game-multiplier');
-    if (multiplierEl) multiplierEl.textContent = Game.state.multiplier;
   },
   
   /**
-   * 更新按钮状态
+   * 更新按钮
    */
   updateButtons() {
     const isMyTurn = Game.state.currentPlayer === 0;
-    const canPass = Game.state.lastPlayIndex !== -1 && Game.state.lastPlayIndex !== 0;
+    const actionBar = document.getElementById('action-bar');
     
-    const actionBtns = document.getElementById('action-buttons');
-    const playBtn = document.getElementById('btn-play');
-    const passBtn = document.getElementById('btn-pass');
-    const hintBtn = document.getElementById('btn-hint');
+    // 隐藏所有按钮
+    Array.from(actionBar.children).forEach(btn => btn.classList.add('hidden'));
     
-    // 显示/隐藏操作按钮
-    if (actionBtns) {
-      if (isMyTurn) {
-        actionBtns.classList.remove('hidden');
-      } else {
-        actionBtns.classList.add('hidden');
+    if (isMyTurn) {
+      const playBtn = document.getElementById('btn-play');
+      const passBtn = document.getElementById('btn-pass');
+      const hintBtn = document.getElementById('btn-hint');
+      
+      playBtn.classList.remove('hidden');
+      hintBtn.classList.remove('hidden');
+      
+      // 如果必须出牌（比如我是先手，或者上一轮大家都不要），则不能不要
+      const mustPlay = !Game.state.lastPlay || Game.state.lastPlayIndex === 0;
+      if (!mustPlay) {
+        passBtn.classList.remove('hidden');
       }
     }
-    
-    if (playBtn) {
-      playBtn.disabled = !isMyTurn || Game.selectedCards.size === 0;
-    }
-    
-    if (passBtn) {
-      passBtn.disabled = !isMyTurn || !canPass;
-    }
-    
-    if (hintBtn) {
-      hintBtn.disabled = !isMyTurn;
-    }
-    
-    // 更新计时器显示
-    const timerSection = document.getElementById('timer-section');
-    if (timerSection) {
-      if (isMyTurn) {
-        timerSection.classList.remove('hidden');
-      } else {
-        timerSection.classList.add('hidden');
-      }
-    }
-  },
-  
-  // 倒计时相关
-  turnTimer: null,
-  turnTimeLeft: 30,
-  
-  /**
-   * 更新回合指示
-   */
-  updateTurnIndicator() {
-    const currentIdx = Game.state.currentPlayer;
-    
-    // 清除之前的计时器
-    if (this.turnTimer) {
-      clearInterval(this.turnTimer);
-      this.turnTimer = null;
-    }
-    
-    // 隐藏所有计时器
-    document.querySelectorAll('.opponent-timer').forEach(el => {
-      el.classList.add('hidden');
-    });
-    
-    // 移除所有active
-    document.querySelectorAll('.opponent-area').forEach(el => {
-      el.classList.remove('current-turn');
-      el.querySelector('.turn-indicator')?.classList.add('hidden');
-    });
-    document.querySelector('.player-bottom-area')?.classList.remove('current-turn');
-    
-    // 添加当前玩家标识和倒计时
-    this.turnTimeLeft = 30;
-    
-    if (currentIdx === 0) {
-      // 自己的回合，显示底部计时器
-      document.querySelector('.player-bottom-area')?.classList.add('current-turn');
-      this.startTurnTimer(null); // 自己回合，计时器在timer-section显示
-    } else if (currentIdx === 1) {
-      const area = document.getElementById('opponent-top');
-      area?.classList.add('current-turn');
-      area?.querySelector('.turn-indicator')?.classList.remove('hidden');
-      // 显示顶部对手的倒计时
-      const timer = document.getElementById('timer-top');
-      if (timer) {
-        timer.classList.remove('hidden');
-        this.startTurnTimer(timer);
-      }
-    } else {
-      const area = document.getElementById('opponent-left');
-      area?.classList.add('current-turn');
-      area?.querySelector('.turn-indicator')?.classList.remove('hidden');
-      // 显示左侧对手的倒计时
-      const timer = document.getElementById('timer-left');
-      if (timer) {
-        timer.classList.remove('hidden');
-        this.startTurnTimer(timer);
-      }
-    }
-  },
-  
-  /**
-   * 启动回合倒计时
-   */
-  startTurnTimer(timerElement) {
-    this.turnTimeLeft = 30;
-    
-    const updateDisplay = () => {
-      if (timerElement) {
-        timerElement.textContent = `${this.turnTimeLeft}s`;
-        // 时间少时变红
-        if (this.turnTimeLeft <= 5) {
-          timerElement.style.color = '#ff4444';
-        } else if (this.turnTimeLeft <= 10) {
-          timerElement.style.color = '#ffaa00';
-        } else {
-          timerElement.style.color = '#4ecdc4';
-        }
-      }
-      // 同时更新底部计时器
-      const timerSection = document.getElementById('timer-section');
-      const timerText = timerSection?.querySelector('.timer-text');
-      if (timerText) {
-        timerText.textContent = `${this.turnTimeLeft}s`;
-      }
-    };
-    
-    updateDisplay();
-    
-    this.turnTimer = setInterval(() => {
-      this.turnTimeLeft--;
-      if (this.turnTimeLeft <= 0) {
-        clearInterval(this.turnTimer);
-        this.turnTimer = null;
-        // 超时自动过牌（如果是自己的回合）
-        if (Game.state.currentPlayer === 0 && Game.state.lastPlayCards.length > 0) {
-          this.passCards();
-        }
-      } else {
-        updateDisplay();
-      }
-    }, 1000);
   },
   
   /**
    * 点击卡牌
    */
   onCardClick(card) {
-    if (Game.state.currentPlayer !== 0) return;
-    
-    Game.toggleSelectCard(card.id);
-    Sound.play('select');
+    if (Game.selectedCards.has(card.id)) {
+      Game.selectedCards.delete(card.id);
+    } else {
+      Game.selectedCards.add(card.id);
+    }
     this.renderHand();
-    this.updateButtons();
-    
-    // 重置提示
-    this.hintIndex = 0;
-    this.hints = [];
   },
   
   /**
    * 出牌
    */
   playCards() {
-    const result = Game.playCards(Array.from(Game.selectedCards));
-    
-    if (!result.success) {
-      alert(result.message);
+    const selected = Array.from(Game.selectedCards);
+    if (selected.length === 0) {
+      this.showNotification('请选择要出的牌');
       return;
     }
     
-    // 播放音效
-    Sound.playCard(result.pattern);
-    Utils.vibrate(50);
-    
-    // 更新界面
-    this.renderGame();
-    
-    // 重置提示
-    this.hintIndex = 0;
-    this.hints = [];
-    
-    // 检查游戏结束
-    if (result.gameOver) {
-      setTimeout(() => this.showGameResult(), 500);
-      return;
+    // 尝试出牌
+    const result = Game.play(selected);
+    if (result.success) {
+      if (window.Sound) Sound.play('card_play');
+      this.renderGame();
+      
+      // 检查游戏结束
+      if (Game.checkGameOver()) {
+        this.onGameOver();
+      } else {
+        this.runAI();
+      }
+    } else {
+      this.showNotification(result.message || '出牌不符合规则');
     }
-    
-    // AI回合
-    this.runAI();
   },
   
   /**
@@ -890,372 +358,123 @@ const App = {
    */
   pass() {
     const result = Game.pass();
-    
-    if (!result.success) {
-      alert(result.message);
-      return;
+    if (result.success) {
+      if (window.Sound) Sound.play('pass');
+      this.renderGame();
+      this.runAI();
+    } else {
+      this.showNotification('你必须出牌');
     }
-    
-    Sound.play('pass');
-    this.renderGame();
-    
-    // AI回合
-    this.runAI();
   },
   
   /**
    * 提示
    */
   hint() {
-    if (this.hints.length === 0) {
-      this.hints = Game.getHint();
-      this.hintIndex = 0;
+    const hintCards = Game.getHint();
+    if (hintCards) {
+      Game.selectedCards.clear();
+      hintCards.forEach(id => Game.selectedCards.add(id));
+      this.renderHand();
+    } else {
+      this.showNotification('没有大过上家的牌');
     }
-    
-    if (this.hints.length === 0) {
-      // 没有可出的牌
-      return;
-    }
-    
-    // 循环显示提示
-    const hint = this.hints[this.hintIndex];
-    Game.selectHint(hint);
-    
-    Sound.play('select');
-    this.renderHand();
-    this.updateButtons();
-    
-    // 下一个提示
-    this.hintIndex = (this.hintIndex + 1) % this.hints.length;
   },
   
   /**
    * 运行AI
    */
-  async runAI() {
-    while (Game.state.status === 'playing' && Game.state.currentPlayer !== 0) {
-      const result = await Game.aiTurn();
+  runAI() {
+    setTimeout(() => {
+      if (Game.state.currentPlayer === 0) return; // 轮到玩家了
       
-      if (result) {
-        if (result.type === 'play') {
-          Sound.playCard(result.pattern);
-        } else {
-          Sound.play('pass');
-        }
-        
-        this.renderGame();
-        
-        if (result.gameOver) {
-          setTimeout(() => this.showGameResult(), 500);
-          return;
-        }
-      }
-    }
-    
-    // 轮到玩家
-    if (Game.state.currentPlayer === 0) {
-      Sound.play('my_turn');
+      Game.playAI();
       this.renderGame();
-    }
-  },
-  
-  /**
-   * 显示游戏结果
-   */
-  showGameResult() {
-    const result = Game.getResult();
-    const modal = document.getElementById('game-over-modal');
-    
-    if (modal) {
-      const header = document.getElementById('result-header');
-      const scoreChange = document.getElementById('score-change');
-      const rankings = document.getElementById('final-rankings');
       
-      if (header) {
-        header.innerHTML = `
-          <span class="result-icon">${result.isWin ? '🏆' : '😢'}</span>
-          <h2 class="result-title">${result.isWin ? '胜利!' : '失败'}</h2>
-        `;
-      }
-      
-      if (scoreChange) {
-        const myScore = result.scores[0]?.score || 0;
-        scoreChange.innerHTML = `
-          <span class="score-value ${myScore >= 0 ? 'positive' : 'negative'}">${myScore >= 0 ? '+' : ''}${myScore}</span>
-          <span class="score-label">金币</span>
-        `;
-      }
-      
-      if (rankings) {
-        rankings.innerHTML = result.scores.map((s, i) => `
-          <div class="ranking-item ${i === 0 ? 'first' : ''}">
-            <span class="rank">#${s.rank}</span>
-            <span class="name">${s.name}</span>
-            <span class="score ${s.score >= 0 ? 'positive' : 'negative'}">
-              ${s.score >= 0 ? '+' : ''}${s.score}
-            </span>
-          </div>
-        `).join('');
-      }
-      
-      // 播放音效
-      Sound.play(result.isWin ? 'win' : 'lose');
-      
-      modal.classList.remove('hidden');
-      
-      // 更新用户数据
-      if (this.user) {
-        if (result.isWin) {
-          this.user.wins++;
-          this.user.coins += result.scores[0].score;
-          this.user.exp += 20;
+      if (Game.checkGameOver()) {
+        this.onGameOver();
+      } else {
+        // 如果还是AI回合（比如连出），继续
+        if (Game.state.currentPlayer !== 0) {
+          this.runAI();
         } else {
-          this.user.losses++;
-          this.user.coins = Math.max(0, this.user.coins + (result.scores.find(s => s.name === this.user.name)?.score || 0));
-          this.user.exp += 5;
+          this.showNotification('轮到你了');
         }
-        
-        // 升级检测
-        if (this.user.exp >= this.user.level * 100) {
-          this.user.exp -= this.user.level * 100;
-          this.user.level++;
-        }
-        
-        this.saveUser();
       }
-    }
-  },
-  
-  // ==================== 联机功能 ====================
-  
-  /**
-   * 创建房间
-   */
-  async createRoom() {
-    const nickInput = document.getElementById('create-nick-input');
-    const nick = nickInput?.value?.trim() || this.user?.name || '玩家';
-    
-    if (!nick) {
-      alert('请输入昵称');
-      return;
-    }
-    
-    try {
-      // 连接服务器
-      await Network.connect();
-      
-      // 生成随机房间号
-      const roomId = String(Math.floor(1000 + Math.random() * 9000));
-      
-      // 加入房间
-      await Network.join(roomId, nick);
-      
-      this.isOnline = true;
-      this.closeAllModals();
-      
-      // 显示等待弹窗
-      document.getElementById('waiting-room-id').textContent = roomId;
-      this.showModal('waiting-modal');
-      
-    } catch (err) {
-      alert('连接失败: ' + err.message);
-    }
-  },
-  
-  /**
-   * 加入房间
-   */
-  async joinRoom() {
-    const roomInput = document.getElementById('room-id-input');
-    const nickInput = document.getElementById('room-nick-input');
-    
-    const roomId = roomInput?.value?.trim();
-    const nick = nickInput?.value?.trim() || this.user?.name || '玩家';
-    
-    if (!roomId || roomId.length !== 4) {
-      alert('请输入4位房间号');
-      return;
-    }
-    
-    if (!nick) {
-      alert('请输入昵称');
-      return;
-    }
-    
-    try {
-      await Network.connect();
-      await Network.join(roomId, nick);
-      
-      this.isOnline = true;
-      this.closeAllModals();
-      
-      document.getElementById('waiting-room-id').textContent = roomId;
-      this.showModal('waiting-modal');
-      
-    } catch (err) {
-      alert('加入失败: ' + err.message);
-    }
-  },
-  
-  /**
-   * 离开房间
-   */
-  leaveRoom() {
-    Network.leave();
-    Network.disconnect();
-    this.isOnline = false;
-    this.roomPlayers = [];
-    this.closeAllModals();
-  },
-  
-  /**
-   * 开始联机游戏
-   */
-  startOnlineGame() {
-    Network.startGame();
-  },
-  
-  /**
-   * 房间状态更新
-   */
-  onRoomState(state) {
-    this.roomPlayers = state.players || [];
-    this.updateWaitingUI();
-    
-    // 如果有游戏状态，进入游戏
-    if (state.gameState) {
-      this.gameState = state.gameState;
-      this.closeAllModals();
-      this.showScreen('game');
-      this.renderOnlineGame();
-    }
-  },
-  
-  /**
-   * 私有状态（手牌）
-   */
-  onPrivateState(state) {
-    if (state && typeof state === 'object') {
-      if ('number' === typeof state) {
-        // 可能是手牌数量
-      } else if (Array.isArray(state)) {
-        this.myHand = state;
-      } else if (state.hand) {
-        this.myHand = state.hand;
-      }
-    }
-    this.renderOnlineGame();
-  },
-  
-  /**
-   * 游戏状态更新
-   */
-  onGameState(state) {
-    this.gameState = state;
-    this.renderOnlineGame();
-  },
-  
-  /**
-   * 出牌结果
-   */
-  onTurnResult(result) {
-    if (result.pattern) {
-      Sound.playCard(result.pattern);
-    }
+    }, 1000);
   },
   
   /**
    * 游戏结束
    */
-  onGameOver(result) {
-    // 显示结果
-    this.showOnlineResult(result);
+  onGameOver() {
+    const winner = Game.state.winner;
+    const isWin = winner === 0;
+    
+    const title = document.getElementById('result-title');
+    title.textContent = isWin ? '胜利!' : '失败';
+    title.style.color = isWin ? 'var(--primary)' : 'var(--text-muted)';
+    
+    if (window.Sound) Sound.play(isWin ? 'win' : 'lose');
+    
+    // 显示分数
+    const scoresDiv = document.getElementById('result-scores');
+    scoresDiv.innerHTML = '';
+    
+    Game.state.players.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = `score-row ${i === winner ? 'winner' : ''}`;
+      row.innerHTML = `
+        <span>${p.name}</span>
+        <span>${i === winner ? '+100' : '-50'}</span>
+      `;
+      scoresDiv.appendChild(row);
+    });
+    
+    this.showModal('result-modal');
   },
   
   /**
-   * 网络错误
+   * 准备（下一局）
    */
-  onNetworkError(err) {
-    console.error('网络错误:', err);
-    alert(err.message || '网络错误');
+  prepare() {
+    this.startGame('local');
   },
   
   /**
-   * 断开连接
+   * 退出游戏
    */
-  onDisconnected() {
-    if (this.isOnline) {
-      alert('与服务器断开连接');
-      this.isOnline = false;
+  confirmExit() {
+    if (confirm('确定要退出游戏吗？')) {
       this.showScreen('lobby');
     }
   },
   
-  /**
-   * 更新等待界面
-   */
-  updateWaitingUI() {
-    const playerList = document.getElementById('waiting-players');
-    const startBtn = document.getElementById('btn-start-game');
-    const waitingText = document.getElementById('waiting-text');
-    
-    if (playerList) {
-      playerList.innerHTML = this.roomPlayers.map((p, i) => `
-        <div class="player-item ${i === 0 ? 'owner' : ''}">
-          <div class="player-avatar">${p.name?.charAt(0) || '?'}</div>
-          <div class="player-info">
-            <div class="player-name">${p.name || '玩家'}</div>
-            <div class="player-status">${i === 0 ? '房主' : '已加入'}</div>
-          </div>
-        </div>
-      `).join('');
-      
-      // 空位
-      for (let i = this.roomPlayers.length; i < 3; i++) {
-        playerList.innerHTML += `<div class="player-slot">等待玩家加入...</div>`;
-      }
-    }
-    
-    // 判断是否是房主
-    const isOwner = this.roomPlayers.length > 0 && 
-                    Network.socket && 
-                    this.roomPlayers[0]?.id === Network.socket.id;
-    
-    if (startBtn) {
-      startBtn.disabled = this.roomPlayers.length < 2;
-      startBtn.style.display = isOwner ? 'block' : 'none';
-    }
-    
-    if (waitingText) {
-      if (isOwner) {
-        waitingText.textContent = this.roomPlayers.length >= 2 
-          ? '人数足够，可以开始游戏！' 
-          : '等待其他玩家加入...';
-      } else {
-        waitingText.textContent = '等待房主开始游戏...';
-      }
-    }
+  // --- 辅助功能 ---
+  
+  showModal(id) {
+    document.getElementById(id)?.classList.remove('hidden');
   },
   
-  /**
-   * 渲染联机游戏
-   */
-  renderOnlineGame() {
-    // TODO: 实现联机游戏界面渲染
-    // 使用 this.gameState, this.myHand, this.roomPlayers
-    console.log('渲染联机游戏', this.gameState, this.myHand);
+  hideModal(id) {
+    document.getElementById(id)?.classList.add('hidden');
   },
   
-  /**
-   * 显示联机结果
-   */
-  showOnlineResult(result) {
-    // TODO: 显示联机游戏结果
-    console.log('游戏结果', result);
+  showNotification(msg, duration = 2000) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = msg;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
   }
 };
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
+// 启动应用
+window.addEventListener('DOMContentLoaded', () => {
   App.init();
 });

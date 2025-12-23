@@ -18,11 +18,11 @@ const Cards = {
   },
 
   // 顺子数值映射 (用于检测顺子)
-  // A可以当1或14, 2可以当2或15, 3可以当3或16
+  // A可以当1或14, 2只能当2, 3只能当3 (根据用户规则: QKA2不能出, 但2-K可以出)
   STRAIGHT_VALUES: {
     'A': [1, 14],
-    '2': [2, 15],
-    '3': [3, 16],
+    '2': [2],
+    '3': [3],
     '4': [4], '5': [5], '6': [6], '7': [7], '8': [8], '9': [9],
     '10': [10], 'J': [11], 'Q': [12], 'K': [13]
   },
@@ -136,25 +136,60 @@ const Cards = {
     div.dataset.index = index;
     
     // 设置颜色类
-    if (card.isJoker) {
-      div.classList.add(card.isBigJoker ? 'joker-big' : 'joker-small');
-    } else if (card.isRed) {
-      div.classList.add('card-red');
+    if (card.isRed || (card.isJoker && card.isBigJoker)) {
+      div.classList.add('red');
     } else {
-      div.classList.add('card-black');
+      div.classList.add('black');
     }
     
-    // 内容
-    const rankSpan = document.createElement('span');
-    rankSpan.className = 'card-rank';
-    rankSpan.textContent = card.displayRank;
-    
-    const suitSpan = document.createElement('span');
-    suitSpan.className = 'card-suit';
-    suitSpan.textContent = card.isJoker ? '王' : card.suit;
-    
-    div.appendChild(rankSpan);
-    div.appendChild(suitSpan);
+    if (card.isJoker) {
+      // 王牌布局
+      const text = card.isBigJoker ? 'JOKER' : 'joker';
+      
+      const topDiv = document.createElement('div');
+      topDiv.className = 'card-top';
+      topDiv.style.writingMode = 'vertical-rl';
+      topDiv.style.textOrientation = 'upright';
+      topDiv.style.fontSize = '10px';
+      topDiv.style.letterSpacing = '2px';
+      topDiv.textContent = text;
+      
+      const centerDiv = document.createElement('div');
+      centerDiv.className = 'card-center';
+      centerDiv.textContent = '🤡';
+      
+      const bottomDiv = document.createElement('div');
+      bottomDiv.className = 'card-bottom';
+      bottomDiv.style.writingMode = 'vertical-rl';
+      bottomDiv.style.textOrientation = 'upright';
+      bottomDiv.style.fontSize = '10px';
+      bottomDiv.style.letterSpacing = '2px';
+      bottomDiv.textContent = text;
+
+      div.appendChild(topDiv);
+      div.appendChild(centerDiv);
+      div.appendChild(bottomDiv);
+    } else {
+      // 普通牌布局
+      const rank = card.displayRank;
+      const suit = card.suit;
+      
+      const topDiv = document.createElement('div');
+      topDiv.className = 'card-top';
+      topDiv.innerHTML = `<span>${rank}</span><span>${suit}</span>`;
+      
+      const centerDiv = document.createElement('div');
+      centerDiv.className = 'card-center';
+      centerDiv.textContent = suit;
+      
+      const bottomDiv = document.createElement('div');
+      bottomDiv.className = 'card-bottom';
+      bottomDiv.innerHTML = `<span>${rank}</span><span>${suit}</span>`;
+      
+      div.appendChild(topDiv);
+      div.appendChild(centerDiv);
+      div.appendChild(bottomDiv);
+    }
     
     return div;
   },

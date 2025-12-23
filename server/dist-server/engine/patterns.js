@@ -1,472 +1,182 @@
-/**
- * 牌型识别和比较
- */
-const Patterns = {
-  // 牌型类型
-  TYPES: {
-    INVALID: 'invalid',
-    SINGLE: 'single',
-    PAIR: 'pair',
-    TRIPLE: 'triple',
-    STRAIGHT: 'straight',       // 顺子
-    DOUBLE_STRAIGHT: 'double_straight', // 连对
-    BOMB: 'bomb',               // 炸弹 (4张)
-    HONG: 'hong',               // 轰 (6张)
-    ROCKET: 'rocket'            // 王炸
-  },
-  
-  /**
-   * 识别牌型
-   */
-  detect(cards) {
-    if (!cards || cards.length === 0) {
-      return { type: this.TYPES.INVALID };
-    }
-    
-    const sorted = Cards.sortByValue(cards);
-    const len = sorted.length;
-    
-    // 单张
-    if (len === 1) {
-      return {
-        type: this.TYPES.SINGLE,
-        value: sorted[0].value,
-        cards: sorted
-      };
-    }
-    
-    // 对子
-    if (len === 2 && sorted[0].value === sorted[1].value) {
-      return {
-        type: this.TYPES.PAIR,
-        value: sorted[0].value,
-        cards: sorted
-      };
-    }
-    
-    // 王炸
-    if (len === 2 && sorted[0].isJoker && sorted[1].isJoker) {
-      return {
-        type: this.TYPES.ROCKET,
-        value: 100,
-        cards: sorted,
-        isBomb: true
-      };
-    }
-    
-    // 三张
-    if (len === 3 && this.isSameRank(sorted, 3)) {
-      return {
-        type: this.TYPES.TRIPLE,
-        value: sorted[0].value,
-        cards: sorted
-      };
-    }
-    
-    // 炸弹 (4张)
-    if (len === 4 && this.isSameRank(sorted, 4)) {
-      return {
-        type: this.TYPES.BOMB,
-        value: sorted[0].value,
-        cards: sorted,
-        isBomb: true,
-        bombSize: 4
-      };
-    }
-    
-    // 顺子 (5张或更多连续单牌)
-    if (len >= 5 && this.isStraight(sorted)) {
-      return {
-        type: this.TYPES.STRAIGHT,
-        value: sorted[0].value,
-        length: len,
-        cards: sorted
-      };
-    }
-    
-    // 连对 (3对或更多连续对子)
-    if (len >= 6 && len % 2 === 0 && this.isDoubleStraight(sorted)) {
-      return {
-        type: this.TYPES.DOUBLE_STRAIGHT,
-        value: sorted[0].value,
-        length: len / 2,
-        cards: sorted
-      };
-    }
-    
-    // 轰 (6张相同)
-    if (len === 6 && this.isSameRank(sorted, 6)) {
-      return {
-        type: this.TYPES.HONG,
-        value: sorted[0].value,
-        cards: sorted,
-        isBomb: true,
-        bombSize: 6
-      };
-    }
-    
-    // 更大的炸弹 (5张或更多相同)
-    if (len >= 5 && this.isSameRank(sorted, len)) {
-      return {
-        type: this.TYPES.BOMB,
-        value: sorted[0].value,
-        cards: sorted,
-        isBomb: true,
-        bombSize: len
-      };
-    }
-    
-    return { type: this.TYPES.INVALID };
-  },
-  
-  /**
-   * 检查是否全是相同点数
-   */
-  isSameRank(cards, count) {
-    if (cards.length < count) return false;
-    const firstValue = cards[0].value;
-    return cards.slice(0, count).every(c => c.value === firstValue);
-  },
-  
-  /**
-   * 检查是否是顺子
-   * 要进规则: 
-   * 1. 顺子可以包含2、3 (A23, 234, A23456等)
-   * 2. 跟K相连的顺子最多带个A (QKA可以, QKA2不行)
-   * 3. 不能包含王
-   */
-  isStraight(cards) {
-    // 不能包含王
-    if (cards.some(c => c.isJoker)) return false;
-    
-    // 获取所有可能的顺子值组合
-    const possibleValues = cards.map(c => Cards.STRAIGHT_VALUES[c.rank] || []);
-    
-    // 尝试找到一种组合使得数值连续
-    // 使用回溯法或简单的迭代
-    const combinations = this.getCombinations(possibleValues);
-    
-    for (const combo of combinations) {
-      // 排序
-      combo.sort((a, b) => a - b);
-      
-      // 检查连续性
-      let isConsecutive = true;
-      for (let i = 1; i < combo.length; i++) {
-        if (combo[i] - combo[i-1] !== 1) {
-          isConsecutive = false;
-          break;
-        }
-      }
-      
-      if (isConsecutive) {
-        // 检查特殊规则: 不能同时包含K(13)和2(2或15)
-        // 如果顺子包含K(13)，则不能包含2
-        // 注意: 2的值可能是2或15。如果包含K(13)，那么2只能作为15出现(13,14,15)。
-        // 但是规则说 "QKA2就不能出"。QKA2对应 12,13,14,15。
-        // 所以如果包含13(K)和15(2)，则无效。
-        // 如果包含13(K)和2(2)，则无效 (因为不连续，除非很长的顺子...但2,3...K是不可能的，因为2是2)
-        // 实际上只要检查是否同时包含K和2即可
-        const hasK = cards.some(c => c.rank === 'K');
-        const has2 = cards.some(c => c.rank === '2');
-        
-        if (hasK && has2) {
-          continue; // 这种组合无效，尝试下一个(虽然对于同一组牌，K和2的存在是固定的)
-          // 如果这组牌里有K和2，那么无论怎么取值，都违反了"QKA2不能出"的规则
-          // 除非有一种取值让它们不构成顺子？不，我们是在找合法的顺子组合。
-          // 如果找到了连续组合，但包含K和2，那么这个顺子是不合法的。
-          // 由于K和2的存在是物理牌决定的，所以只要有K和2，就不能组成顺子。
-          return false;
-        }
-        
-        return true;
-      }
-    }
-    
-    return false;
-  },
-  
-  /**
-   * 获取所有可能的组合
-   */
-  getCombinations(arrays) {
-    if (arrays.length === 0) return [[]];
-    const first = arrays[0];
-    const rest = this.getCombinations(arrays.slice(1));
-    const result = [];
-    for (const val of first) {
-      for (const r of rest) {
-        result.push([val, ...r]);
-      }
-    }
-    return result;
-  },
-  
-  /**
-   * 检查是否是连对
-   * 要进规则: 同顺子规则
-   */
-  isDoubleStraight(cards) {
-    // 不能包含王
-    if (cards.some(c => c.isJoker)) return false;
-    
-    // 按Rank分组
-    const groups = {};
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.detectPattern = detectPattern;
+exports.canBeat = canBeat;
+const cards_1 = require("./cards");
+function allSameRank(cards) {
+    if (cards.length === 0)
+        return null;
+    const r0 = cards[0].rank;
+    for (const c of cards)
+        if (c.rank !== r0)
+            return null;
+    return r0;
+}
+function countByRank(cards) {
+    const m = new Map();
     for (const c of cards) {
-      if (!groups[c.rank]) groups[c.rank] = 0;
-      groups[c.rank]++;
+        const a = m.get(c.rank) ?? [];
+        a.push(c);
+        m.set(c.rank, a);
     }
-    
-    // 必须每种Rank都有2张
-    const ranks = Object.keys(groups);
-    if (ranks.some(r => groups[r] !== 2)) return false;
-    
-    // 将Ranks转换为单张牌进行顺子检测
-    // 构造一个虚拟的手牌，每种Rank取一张
-    const virtualHand = ranks.map(r => ({ rank: r, isJoker: false }));
-    
-    return this.isStraight(virtualHand);
-  },
-  
-  /**
-   * 比较两个牌型, 返回true表示pattern1能压过pattern2
-   */
-  canBeat(pattern1, pattern2) {
-    if (!pattern1 || pattern1.type === this.TYPES.INVALID) {
-      return false;
+    return m;
+}
+function isStraight(cards) {
+    if (cards.length < 3)
+        return { ok: false };
+    // jokers not allowed
+    if (cards.some(c => c.isJoker))
+        return { ok: false };
+    // unique ranks
+    const ranks = Array.from(new Set(cards.map(c => c.rank)));
+    if (ranks.length !== cards.length)
+        return { ok: false };
+    // Special case: A-2-3 (1-2-3)
+    // Ranks must be exactly A, 2, 3
+    if (cards.length === 3) {
+        const hasA = ranks.includes('A');
+        const has2 = ranks.includes('2');
+        const has3 = ranks.includes('3');
+        if (hasA && has2 && has3) {
+            // Return sequence A, 2, 3 for strength calculation
+            return { ok: true, seq: ['A', '2', '3'] };
+        }
     }
-    if (!pattern2 || pattern2.type === this.TYPES.INVALID) {
-      return true;
+    // sort by straight ring order
+    const sorted = [...ranks].sort((a, b) => (cards_1.straightRing.indexOf(a) - cards_1.straightRing.indexOf(b)));
+    // check consecutive
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const nxt = (0, cards_1.nextInRing)(sorted[i]);
+        if (nxt !== sorted[i + 1])
+            return { ok: false };
     }
-    
-    // 王炸最大
-    if (pattern1.type === this.TYPES.ROCKET) {
-      return true;
+    return { ok: true, seq: sorted };
+}
+function isDoubleSequence(cards) {
+    if (cards.length < 6 || cards.length % 2 !== 0)
+        return { ok: false };
+    if (cards.some(c => c.isJoker))
+        return { ok: false };
+    // count by rank
+    const m = countByRank(cards);
+    const pairs = [];
+    for (const [r, arr] of m.entries()) {
+        if (arr.length !== 2)
+            return { ok: false };
+        pairs.push(r);
     }
-    if (pattern2.type === this.TYPES.ROCKET) {
-      return false;
+    // sort and check consecutive between pair ranks
+    const sorted = pairs.sort((a, b) => (cards_1.straightRing.indexOf(a) - cards_1.straightRing.indexOf(b)));
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const nxt = (0, cards_1.nextInRing)(sorted[i]);
+        if (nxt !== sorted[i + 1])
+            return { ok: false };
     }
-    
-    // 炸弹比较
-    if (pattern1.isBomb && pattern2.isBomb) {
-      // 先比较炸弹大小 (张数)
-      if (pattern1.bombSize !== pattern2.bombSize) {
-        return pattern1.bombSize > pattern2.bombSize;
-      }
-      // 再比较点数
-      return pattern1.value > pattern2.value;
+    return { ok: true, seq: sorted };
+}
+function detectPattern(cards) {
+    const arr = [...cards];
+    arr.sort((a, b) => a.sortValue - b.sortValue);
+    // SINGLE
+    if (arr.length === 1) {
+        const c = arr[0];
+        const strength = c.sortValue;
+        return { type: 'SINGLE', cards: arr, label: `单: ${(0, cards_1.formatCard)(c)}`, strength };
     }
-    
-    // 炸弹压普通牌
-    if (pattern1.isBomb && !pattern2.isBomb) {
-      return true;
+    // PAIR
+    if (arr.length === 2) {
+        // Check for King Bomb (Joker Pair)
+        const isKingBomb = arr.every(c => c.isJoker);
+        if (isKingBomb) {
+            return { type: 'PAIR', cards: arr, label: '王炸', strength: Number.MAX_SAFE_INTEGER, extra: { isKingBomb: true } };
+        }
+        const same = allSameRank(arr);
+        if (same) {
+            const strength = arr[0].sortValue;
+            return { type: 'PAIR', cards: arr, label: `对: ${(0, cards_1.formatCard)(arr[0])} ${(0, cards_1.formatCard)(arr[1])}`, strength, extra: { isKingBomb: false } };
+        }
+        return null;
     }
-    if (!pattern1.isBomb && pattern2.isBomb) {
-      return false;
+    // TRIPLE (炸)
+    if (arr.length === 3) {
+        const same = allSameRank(arr);
+        if (same && !arr[0].isJoker) {
+            const strength = arr[0].sortValue;
+            return { type: 'TRIPLE', cards: arr, label: `炸: ${(0, cards_1.formatCard)(arr[0])}*3`, strength };
+        }
+        // STRAIGHT
+        const s = isStraight(arr);
+        if (s.ok && s.seq) {
+            const strength = (0, cards_1.straightStartValue)(s.seq);
+            return { type: 'STRAIGHT', cards: arr, label: `顺子(${arr.length}): ${arr.map(cards_1.formatCard).join(' ')}`, strength, extra: { straightLength: arr.length } };
+        }
+        return null;
     }
-    
-    // 相同类型比较
-    if (pattern1.type !== pattern2.type) {
-      return false;
+    // FOUR (轰)
+    if (arr.length === 4) {
+        const same = allSameRank(arr);
+        if (same && !arr[0].isJoker) {
+            const strength = arr[0].sortValue;
+            return { type: 'FOUR', cards: arr, label: `轰: ${(0, cards_1.formatCard)(arr[0])}*4`, strength };
+        }
     }
-    
-    // 顺子和连对需要长度相同
-    if (pattern1.type === this.TYPES.STRAIGHT || 
-        pattern1.type === this.TYPES.DOUBLE_STRAIGHT) {
-      if (pattern1.length !== pattern2.length) {
+    // DOUBLE SEQUENCE
+    const ds = isDoubleSequence(arr);
+    if (ds.ok && ds.seq) {
+        const strength = (0, cards_1.straightStartValue)(ds.seq);
+        return { type: 'DOUBLE_SEQUENCE', cards: arr, label: `连对(${arr.length / 2}): ${arr.map(cards_1.formatCard).join(' ')}`, strength, extra: { straightLength: arr.length / 2 } };
+    }
+    // STRAIGHT general >=3
+    const st = isStraight(arr);
+    if (st.ok && st.seq) {
+        const strength = (0, cards_1.straightStartValue)(st.seq);
+        return { type: 'STRAIGHT', cards: arr, label: `顺子(${arr.length}): ${arr.map(cards_1.formatCard).join(' ')}`, strength, extra: { straightLength: arr.length } };
+    }
+    return null;
+}
+function canBeat(previous, next) {
+    // 逻辑五~九
+    if (previous.type === 'SINGLE') {
+        if (next.type === 'SINGLE')
+            return next.strength > previous.strength;
+        if (next.type === 'TRIPLE' || next.type === 'FOUR')
+            return true; // 炸/轰大于单
+        // 王炸（二王）作为PAIR在识别中，但出牌阶段应视为轰
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
+            return true;
         return false;
-      }
     }
-    
-    return pattern1.value > pattern2.value;
-  },
-  
-  /**
-   * 获取提示 (找到能压过的牌)
-   */
-  getHints(hand, lastPattern) {
-    const hints = [];
-    
-    if (!lastPattern || lastPattern.type === this.TYPES.INVALID) {
-      // 自由出牌, 返回最小的单张
-      const sorted = Cards.sortByValue(hand);
-      if (sorted.length > 0) {
-        hints.push([sorted[sorted.length - 1]]);
-      }
-      return hints;
+    if (previous.type === 'PAIR') {
+        if (next.type === 'PAIR' && !next.extra?.isKingBomb)
+            return next.strength > previous.strength;
+        if (next.type === 'TRIPLE' || next.type === 'FOUR')
+            return true;
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
+            return true; // 王炸
+        return false;
     }
-    
-    // 根据上家牌型找能压过的牌
-    const targetType = lastPattern.type;
-    const targetValue = lastPattern.value;
-    
-    // 按点数分组
-    const groups = this.groupByValue(hand);
-    
-    switch (targetType) {
-      case this.TYPES.SINGLE:
-        // 找更大的单张
-        for (const [value, cards] of Object.entries(groups)) {
-          if (parseInt(value) > targetValue) {
-            hints.push([cards[0]]);
-          }
+    if (previous.type === 'STRAIGHT') {
+        if (next.type === 'STRAIGHT' && (next.extra?.straightLength === previous.extra?.straightLength)) {
+            return next.strength > previous.strength;
         }
-        break;
-        
-      case this.TYPES.PAIR:
-        // 找更大的对子
-        for (const [value, cards] of Object.entries(groups)) {
-          if (cards.length >= 2 && parseInt(value) > targetValue) {
-            hints.push(cards.slice(0, 2));
-          }
-        }
-        break;
-        
-      case this.TYPES.STRAIGHT:
-        // 找更大的顺子
-        hints.push(...this.findStraights(hand, lastPattern.length, targetValue));
-        break;
-        
-      case this.TYPES.DOUBLE_STRAIGHT:
-        // 找更大的连对
-        hints.push(...this.findDoubleStraights(hand, lastPattern.length, targetValue));
-        break;
+        if (next.type === 'TRIPLE' || next.type === 'FOUR' || (next.type === 'PAIR' && next.extra?.isKingBomb))
+            return true;
+        return false;
     }
-    
-    // 添加炸弹选项
-    if (!lastPattern.isBomb) {
-      hints.push(...this.findBombs(hand, 0));
-    } else {
-      hints.push(...this.findBombs(hand, targetValue, lastPattern.bombSize));
+    if (previous.type === 'TRIPLE') {
+        if (next.type === 'TRIPLE')
+            return next.strength > previous.strength;
+        if (next.type === 'FOUR' || (next.type === 'PAIR' && next.extra?.isKingBomb))
+            return true;
+        return false;
     }
-    
-    return hints;
-  },
-  
-  /**
-   * 按点数分组
-   */
-  groupByValue(cards) {
-    const groups = {};
-    for (const card of cards) {
-      if (!groups[card.value]) {
-        groups[card.value] = [];
-      }
-      groups[card.value].push(card);
+    if (previous.type === 'FOUR') {
+        // 轰只能被更大的轰或王轰（两王）压制
+        if (next.type === 'FOUR')
+            return next.strength > previous.strength;
+        if (next.type === 'PAIR' && next.extra?.isKingBomb)
+            return true;
+        return false;
     }
-    return groups;
-  },
-  
-  /**
-   * 找顺子
-   */
-  findStraights(hand, length, minValue = 0) {
-    const results = [];
-    const sorted = hand.filter(c => c.value < 15).sort((a, b) => a.value - b.value);
-    
-    // 简化: 只找从某个起点开始的连续牌
-    for (let i = 0; i <= sorted.length - length; i++) {
-      const straight = [sorted[i]];
-      let lastValue = sorted[i].value;
-      
-      for (let j = i + 1; j < sorted.length && straight.length < length; j++) {
-        if (sorted[j].value === lastValue + 1) {
-          straight.push(sorted[j]);
-          lastValue = sorted[j].value;
-        } else if (sorted[j].value === lastValue) {
-          continue; // 跳过相同点数
-        } else {
-          break;
-        }
-      }
-      
-      if (straight.length === length && straight[straight.length - 1].value > minValue) {
-        results.push(straight);
-      }
-    }
-    
-    return results;
-  },
-  
-  /**
-   * 找连对
-   */
-  findDoubleStraights(hand, pairCount, minValue = 0) {
-    const results = [];
-    const groups = this.groupByValue(hand);
-    
-    // 找有对子的点数
-    const pairValues = Object.entries(groups)
-      .filter(([v, cards]) => cards.length >= 2 && parseInt(v) < 15)
-      .map(([v]) => parseInt(v))
-      .sort((a, b) => a - b);
-    
-    // 找连续的对子
-    for (let i = 0; i <= pairValues.length - pairCount; i++) {
-      let valid = true;
-      for (let j = 1; j < pairCount; j++) {
-        if (pairValues[i + j] - pairValues[i + j - 1] !== 1) {
-          valid = false;
-          break;
-        }
-      }
-      
-      if (valid && pairValues[i + pairCount - 1] > minValue) {
-        const cards = [];
-        for (let j = 0; j < pairCount; j++) {
-          cards.push(...groups[pairValues[i + j]].slice(0, 2));
-        }
-        results.push(cards);
-      }
-    }
-    
-    return results;
-  },
-  
-  /**
-   * 找炸弹
-   */
-  findBombs(hand, minValue = 0, minSize = 4) {
-    const results = [];
-    const groups = this.groupByValue(hand);
-    
-    // 找4张或更多相同的
-    for (const [value, cards] of Object.entries(groups)) {
-      const v = parseInt(value);
-      if (cards.length >= 4 && (v > minValue || cards.length > minSize)) {
-        results.push(cards.slice(0, Math.max(4, minSize)));
-      }
-    }
-    
-    // 王炸
-    const jokers = hand.filter(c => c.isJoker);
-    if (jokers.length === 2) {
-      results.push(jokers);
-    }
-    
-    return results;
-  },
-  
-  /**
-   * 获取牌型名称
-   */
-  getTypeName(typeOrPattern) {
-    const type = typeof typeOrPattern === 'object' ? typeOrPattern.type : typeOrPattern;
-    const names = {
-      [this.TYPES.SINGLE]: '单张',
-      [this.TYPES.PAIR]: '对子',
-      [this.TYPES.TRIPLE]: '三张',
-      [this.TYPES.STRAIGHT]: '顺子',
-      [this.TYPES.DOUBLE_STRAIGHT]: '连对',
-      [this.TYPES.BOMB]: '炸弹',
-      [this.TYPES.HONG]: '轰',
-      [this.TYPES.ROCKET]: '王炸'
-    };
-    return names[type] || '';
-  }
-};
-
-// 导出
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Patterns;
+    return false;
 }

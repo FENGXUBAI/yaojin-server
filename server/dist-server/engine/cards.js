@@ -1,177 +1,115 @@
-/**
- * 扑克牌定义和工具函数
- * 要进规则: 3是主牌（最大）
- */
-const Cards = {
-  // 花色
-  SUITS: ['♠', '♥', '♦', '♣'],
-  
-  // 点数 (按大小排序 - 要进规则)
-  RANKS: ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2', '3'],
-  
-  // 点数值映射 (要进规则: 3最大)
-  RANK_VALUES: {
-    '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-    '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, '2': 15,
-    '3': 18, // 3是主牌，最大
-    'joker': 16, 'JOKER': 17
-  },
-
-  // 顺子数值映射 (用于检测顺子)
-  // A可以当1或14, 2可以当2或15, 3可以当3或16
-  STRAIGHT_VALUES: {
-    'A': [1, 14],
-    '2': [2, 15],
-    '3': [3, 16],
-    '4': [4], '5': [5], '6': [6], '7': [7], '8': [8], '9': [9],
-    '10': [10], 'J': [11], 'Q': [12], 'K': [13]
-  },
-  
-  /**
-   * 生成一副牌
-   */
-  generateDeck() {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.straightRing = exports.singleOrder = exports.suits = exports.normalRanks = void 0;
+exports.makeCard = makeCard;
+exports.createDeck = createDeck;
+exports.shuffle = shuffle;
+exports.formatCard = formatCard;
+exports.compareSingleOrGroupByRank = compareSingleOrGroupByRank;
+exports.straightStartValue = straightStartValue;
+exports.nextInRing = nextInRing;
+exports.findStraightRuns = findStraightRuns;
+exports.normalRanks = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2', '3'];
+exports.suits = ['♠', '♥', '♦', '♣'];
+// Singles/pairs/triple/four ordering: BIG_JOKER > SMALL_JOKER > 3 > 2 > A > K > Q > J > 10 > 9 > 8 > 7 > 6 > 5 > 4
+exports.singleOrder = ['JOKER_BIG', 'JOKER_SMALL', '3', '2', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4'];
+const singleOrderMap = new Map(exports.singleOrder.map((r, i) => [r, exports.singleOrder.length - i]));
+// Straight/Double Sequence ring order from smallest start to largest: 2 < 3 < 4 < ... < K < A
+exports.straightRing = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const straightRingIndex = new Map(exports.straightRing.map((r, i) => [r, i]));
+function makeCard(rank, suit) {
+    const isJoker = rank === 'JOKER_BIG' || rank === 'JOKER_SMALL';
+    const sortValue = singleOrderMap.get(rank) ?? 0;
+    return { rank, suit, isJoker, sortValue };
+}
+function createDeck() {
     const deck = [];
-    
-    // 普通牌
-    for (const suit of this.SUITS) {
-      for (const rank of this.RANKS) {
-        const isRed = suit === '♥' || suit === '♦';
-        deck.push({
-          id: `${suit}${rank}`,
-          suit,
-          rank,
-          displayRank: rank,
-          value: this.RANK_VALUES[rank],
-          isRed
-        });
-      }
+    // Jokers
+    deck.push(makeCard('JOKER_SMALL'));
+    deck.push(makeCard('JOKER_BIG'));
+    // Suited cards
+    for (const s of exports.suits) {
+        for (const r of exports.normalRanks) {
+            deck.push(makeCard(r, s));
+        }
     }
-    
-    // 大小王
-    deck.push({
-      id: 'joker',
-      suit: '',
-      rank: 'joker',
-      displayRank: '小',
-      value: 16,
-      isJoker: true,
-      isSmallJoker: true
-    });
-    
-    deck.push({
-      id: 'JOKER',
-      suit: '',
-      rank: 'JOKER',
-      displayRank: '大',
-      value: 17,
-      isJoker: true,
-      isBigJoker: true
-    });
-    
     return deck;
-  },
-  
-  /**
-   * 洗牌
-   */
-  shuffle(deck) {
-    return Utils.shuffle(deck);
-  },
-  
-  /**
-   * 发牌 (3人游戏, 每人17张, 底牌3张)
-   */
-  deal(deck) {
-    const shuffled = this.shuffle(deck);
-    return {
-      hands: [
-        shuffled.slice(0, 17),
-        shuffled.slice(17, 34),
-        shuffled.slice(34, 51)
-      ],
-      landlordCards: shuffled.slice(51, 54)
-    };
-  },
-  
-  /**
-   * 发牌 (要进规则, 每人13张, 剩2张)
-   */
-  dealYaojin(deck, playerCount = 4) {
-    const shuffled = this.shuffle(deck);
-    const cardsPerPlayer = Math.floor(54 / playerCount);
-    const hands = [];
-    
-    for (let i = 0; i < playerCount; i++) {
-      hands.push(shuffled.slice(i * cardsPerPlayer, (i + 1) * cardsPerPlayer));
+}
+function shuffle(arr, seed) {
+    // Fisher-Yates; optional seed for reproducibility
+    const a = [...arr];
+    let random = Math.random;
+    if (seed !== undefined) {
+        let t = seed;
+        random = () => {
+            // simple LCG
+            t = (t * 48271) % 0x7fffffff;
+            return (t % 10000) / 10000;
+        };
     }
-    
-    // 剩余牌 (如果有)
-    const remaining = shuffled.slice(playerCount * cardsPerPlayer);
-    
-    return { hands, remaining };
-  },
-  
-  /**
-   * 按点数排序 (大到小)
-   */
-  sortByValue(cards) {
-    return [...cards].sort((a, b) => b.value - a.value);
-  },
-  
-  /**
-   * 获取牌的值
-   */
-  getValue(card) {
-    return this.RANK_VALUES[card.rank] || 0;
-  },
-  
-  /**
-   * 创建卡牌DOM元素
-   */
-  createCardElement(card, index = 0) {
-    const div = document.createElement('div');
-    div.className = 'card';
-    div.dataset.id = card.id;
-    div.dataset.index = index;
-    
-    // 设置颜色类
-    if (card.isJoker) {
-      div.classList.add(card.isBigJoker ? 'joker-big' : 'joker-small');
-    } else if (card.isRed) {
-      div.classList.add('card-red');
-    } else {
-      div.classList.add('card-black');
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
     }
-    
-    // 内容
-    const rankSpan = document.createElement('span');
-    rankSpan.className = 'card-rank';
-    rankSpan.textContent = card.displayRank;
-    
-    const suitSpan = document.createElement('span');
-    suitSpan.className = 'card-suit';
-    suitSpan.textContent = card.isJoker ? '王' : card.suit;
-    
-    div.appendChild(rankSpan);
-    div.appendChild(suitSpan);
-    
-    return div;
-  },
-  
-  /**
-   * 格式化牌为字符串
-   */
-  formatCard(card) {
-    if (!card) return '';
-    if (card.isJoker) {
-      return card.isBigJoker ? '大王' : '小王';
+    return a;
+}
+function formatCard(c) {
+    if (c.isJoker)
+        return c.rank === 'JOKER_BIG' ? '🃏大王' : '🃏小王';
+    return `${c.suit}${c.rank}`;
+}
+function compareSingleOrGroupByRank(a, b) {
+    const va = singleOrderMap.get(a) ?? 0;
+    const vb = singleOrderMap.get(b) ?? 0;
+    return va - vb; // positive means a > b
+}
+function straightStartValue(seq) {
+    // Special rules: A-2-3 is maximum; Q-K-A is second
+    const s = seq[0];
+    const isA23 = seq.length >= 3 && seq[0] === 'A' && seq[1] === '2' && seq[2] === '3';
+    const isQKA = seq.length >= 3 && seq[0] === 'Q' && seq[1] === 'K' && seq[2] === 'A';
+    if (isA23)
+        return 1000000;
+    if (isQKA)
+        return 999000;
+    return (straightRingIndex.get(s) ?? -100) + seq.length * 0.001; // tie-breaker by length minimal
+}
+function nextInRing(r) {
+    const i = straightRingIndex.get(r);
+    if (i === undefined)
+        return null;
+    const j = (i + 1);
+    return exports.straightRing[j] ?? null;
+}
+function findStraightRuns(ranks) {
+    // ranks must be NormalRank strings present in hand (unique)
+    const present = new Set(ranks);
+    const runs = [];
+    // Build runs based on straightRing order
+    let i = 0;
+    while (i < exports.straightRing.length) {
+        const start = exports.straightRing[i];
+        if (!present.has(start)) {
+            i++;
+            continue;
+        }
+        const run = [start];
+        let cur = start;
+        while (true) {
+            const nxt = nextInRing(cur);
+            if (!nxt)
+                break;
+            if (!present.has(nxt))
+                break;
+            run.push(nxt);
+            cur = nxt;
+        }
+        runs.push(run);
+        i += run.length;
     }
-    return `${card.suit}${card.rank}`;
-  }
-};
-
-// 导出
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Cards;
+    // Special A-2-3 presence: if A,2,3 exist we also allow that as a run
+    if (present.has('A') && present.has('2') && present.has('3')) {
+        runs.push(['A', '2', '3']);
+    }
+    return runs;
 }
