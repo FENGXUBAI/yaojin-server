@@ -130,42 +130,102 @@ const Patterns = {
   
   /**
    * 检查是否是顺子
-   * 要进规则: 顺子不能包含 2, 3 和王
+   * 要进规则: 
+   * 1. 顺子可以包含2、3 (A23, 234, A23456等)
+   * 2. 跟K相连的顺子最多带个A (QKA可以, QKA2不行)
+   * 3. 不能包含王
    */
   isStraight(cards) {
-    // 不能包含2, 3和王 (value >= 15 是 2, 16 是小王, 17 是大王, 18 是 3)
-    if (cards.some(c => c.value >= 15 || c.isJoker)) return false;
+    // 不能包含王
+    if (cards.some(c => c.isJoker)) return false;
     
-    // 检查连续性 (从大到小排序)
-    const sorted = [...cards].sort((a, b) => b.value - a.value);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i - 1].value - sorted[i].value !== 1) {
-        return false;
+    // 获取所有可能的顺子值组合
+    const possibleValues = cards.map(c => Cards.STRAIGHT_VALUES[c.rank] || []);
+    
+    // 尝试找到一种组合使得数值连续
+    // 使用回溯法或简单的迭代
+    const combinations = this.getCombinations(possibleValues);
+    
+    for (const combo of combinations) {
+      // 排序
+      combo.sort((a, b) => a - b);
+      
+      // 检查连续性
+      let isConsecutive = true;
+      for (let i = 1; i < combo.length; i++) {
+        if (combo[i] - combo[i-1] !== 1) {
+          isConsecutive = false;
+          break;
+        }
+      }
+      
+      if (isConsecutive) {
+        // 检查特殊规则: 不能同时包含K(13)和2(2或15)
+        // 如果顺子包含K(13)，则不能包含2
+        // 注意: 2的值可能是2或15。如果包含K(13)，那么2只能作为15出现(13,14,15)。
+        // 但是规则说 "QKA2就不能出"。QKA2对应 12,13,14,15。
+        // 所以如果包含13(K)和15(2)，则无效。
+        // 如果包含13(K)和2(2)，则无效 (因为不连续，除非很长的顺子...但2,3...K是不可能的，因为2是2)
+        // 实际上只要检查是否同时包含K和2即可
+        const hasK = cards.some(c => c.rank === 'K');
+        const has2 = cards.some(c => c.rank === '2');
+        
+        if (hasK && has2) {
+          continue; // 这种组合无效，尝试下一个(虽然对于同一组牌，K和2的存在是固定的)
+          // 如果这组牌里有K和2，那么无论怎么取值，都违反了"QKA2不能出"的规则
+          // 除非有一种取值让它们不构成顺子？不，我们是在找合法的顺子组合。
+          // 如果找到了连续组合，但包含K和2，那么这个顺子是不合法的。
+          // 由于K和2的存在是物理牌决定的，所以只要有K和2，就不能组成顺子。
+          return false;
+        }
+        
+        return true;
       }
     }
-    return true;
+    
+    return false;
+  },
+  
+  /**
+   * 获取所有可能的组合
+   */
+  getCombinations(arrays) {
+    if (arrays.length === 0) return [[]];
+    const first = arrays[0];
+    const rest = this.getCombinations(arrays.slice(1));
+    const result = [];
+    for (const val of first) {
+      for (const r of rest) {
+        result.push([val, ...r]);
+      }
+    }
+    return result;
   },
   
   /**
    * 检查是否是连对
-   * 要进规则: 连对不能包含 2, 3 和王
+   * 要进规则: 同顺子规则
    */
   isDoubleStraight(cards) {
-    // 不能包含2, 3和王
-    if (cards.some(c => c.value >= 15 || c.isJoker)) return false;
+    // 不能包含王
+    if (cards.some(c => c.isJoker)) return false;
     
-    const sorted = [...cards].sort((a, b) => b.value - a.value);
-    
-    // 检查每两张是对子且连续
-    for (let i = 0; i < sorted.length; i += 2) {
-      if (sorted[i].value !== sorted[i + 1].value) {
-        return false;
-      }
-      if (i > 0 && sorted[i - 2].value - sorted[i].value !== 1) {
-        return false;
-      }
+    // 按Rank分组
+    const groups = {};
+    for (const c of cards) {
+      if (!groups[c.rank]) groups[c.rank] = 0;
+      groups[c.rank]++;
     }
-    return true;
+    
+    // 必须每种Rank都有2张
+    const ranks = Object.keys(groups);
+    if (ranks.some(r => groups[r] !== 2)) return false;
+    
+    // 将Ranks转换为单张牌进行顺子检测
+    // 构造一个虚拟的手牌，每种Rank取一张
+    const virtualHand = ranks.map(r => ({ rank: r, isJoker: false }));
+    
+    return this.isStraight(virtualHand);
   },
   
   /**

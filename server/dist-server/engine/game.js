@@ -1,662 +1,499 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.formatCard = exports.createDeck = void 0;
-exports.dealHands = dealHands;
-exports.findSpade4Owner = findSpade4Owner;
-exports.initGame = initGame;
-exports.playTurn = playTurn;
-exports.forceWin = forceWin;
-exports.checkRevolution = checkRevolution;
-exports.computeTributePlan = computeTributePlan;
-exports.applyTribute = applyTribute;
-exports.returnTribute = returnTribute;
-exports.resolveReturnTribute = resolveReturnTribute;
-exports.hasValidMove = hasValidMove;
-const cards_1 = require("./cards");
-Object.defineProperty(exports, "createDeck", { enumerable: true, get: function () { return cards_1.createDeck; } });
-Object.defineProperty(exports, "formatCard", { enumerable: true, get: function () { return cards_1.formatCard; } });
-const patterns_1 = require("./patterns");
-function dealHands(deck, playerCount) {
-    const shuffled = (0, cards_1.shuffle)(deck);
-    const hands = Array.from({ length: playerCount }, () => []);
-    for (let i = 0; i < shuffled.length; i++) {
-        hands[i % playerCount].push(shuffled[i]);
+/**
+ * 游戏逻辑
+ */
+const Game = {
+  // 游戏状态
+  state: null,
+  
+  // 选中的牌
+  selectedCards: new Set(),
+  
+  // AI思考延迟
+  AI_DELAY: 1000,
+  
+  // 上一局结果（用于进贡）
+  lastRoundResult: null,
+  
+  /**
+   * 初始化游戏
+   */
+  init(playerName = '玩家') {
+    const deck = Cards.generateDeck();
+    const { hands } = Cards.deal(deck);
+    
+    // 初始化状态
+    this.state = {
+      status: 'playing',
+      currentPlayer: 0,
+      players: [
+        { name: playerName, hand: Cards.sortByValue(hands[0]), isHuman: true },
+        { name: '机器人A', hand: Cards.sortByValue(hands[1]), isHuman: false },
+        { name: '机器人B', hand: Cards.sortByValue(hands[2]), isHuman: false }
+      ],
+      lastPlay: null,
+      lastPlayIndex: -1,
+      passCount: 0,
+      finishedOrder: [],
+      multiplier: 1,
+      tributePhase: null // 进贡阶段状态
+    };
+    
+    // 如果有上一局结果，处理进贡
+    if (this.lastRoundResult && this.lastRoundResult.finishedOrder.length >= 3) {
+      this.processTribute();
+    } else {
+      // 第一局：找♠4先手
+      this.state.currentPlayer = this.findSpade4Owner();
     }
-    // sort each hand by our single order descending (higher first)
-    for (const h of hands)
-        h.sort((a, b) => b.sortValue - a.sortValue);
-    return hands;
-}
-function findSpade4Owner(hands) {
-    for (let i = 0; i < hands.length; i++) {
-        for (const c of hands[i]) {
-            if (!c.isJoker && c.rank === '4' && c.suit === '♠')
-                return i;
-        }
+    
+    this.selectedCards.clear();
+    return this.state;
+  },
+  
+  /**
+   * 找♠4持有者
+   */
+  findSpade4Owner() {
+    for (let i = 0; i < this.state.players.length; i++) {
+      const hand = this.state.players[i].hand;
+      if (hand.some(c => c.rank === '4' && c.suit === '♠')) {
+        return i;
+      }
     }
     return 0;
-}
-function initGame(opts) {
-    const deck = opts.deck ?? (0, cards_1.createDeck)();
-    const gameId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    let hands = dealHands(deck, opts.playerCount);
-    let firstPlayer = 0;
-    let revolution = false;
-    const pendingReturns = [];
-    if (!opts.lastRoundResult) {
-        // 第一局：♠4 先手
-        firstPlayer = findSpade4Owner(hands);
+  },
+  
+  /**
+   * 检查是否革命（需要进贡的人有王轰）
+   */
+  checkRevolution() {
+    if (!this.lastRoundResult) return false;
+    const finishedOrder = this.lastRoundResult.finishedOrder;
+    if (finishedOrder.length < 3) return false;
+    
+    // 第三名需要进贡
+    const donorIdx = finishedOrder[2];
+    const donorHand = this.state.players[donorIdx].hand;
+    
+    // 检查是否有王轰（大王 + 小王）
+    const hasBig = donorHand.some(c => c.isJoker && c.rank === 'JOKER_BIG');
+    const hasSmall = donorHand.some(c => c.isJoker && c.rank === 'JOKER_SMALL');
+    
+    return hasBig && hasSmall;
+  },
+  
+  /**
+   * 处理进贡逻辑
+   */
+  processTribute() {
+    const finishedOrder = this.lastRoundResult.finishedOrder;
+    
+    // 检查革命
+    if (this.checkRevolution()) {
+      console.log('革命！不需要进贡');
+      // 革命：第一名先出
+      this.state.currentPlayer = finishedOrder[0];
+      return;
     }
-    else {
-        // 后续局
-        const { finishedOrder } = opts.lastRoundResult;
-        // Check Revolution
-        revolution = checkRevolution(hands, finishedOrder);
-        // Compute Tribute
-        const plan = computeTributePlan(opts.playerCount, finishedOrder, revolution);
-        // Apply Tribute (Donor -> Receiver)
-        hands = applyTribute(hands, plan);
-        // Prepare Manual Return Tribute
-        for (const { donor, receiver, count } of plan.donorToReceiver) {
-            pendingReturns.push({ actionBy: receiver, returnTo: donor, count });
-        }
-        // Re-sort all hands
-        for (const h of hands)
-            h.sort((a, b) => b.sortValue - a.sortValue);
-        if (revolution) {
-            // 革命：第一个跑了的人先出 (Winner)
-            firstPlayer = finishedOrder[0];
-        }
-        else {
-            // 无革命：最后一个跑了的人先出 (Loser)
-            firstPlayer = finishedOrder[finishedOrder.length - 1];
-        }
+    
+    // 第三名给第二名最大的1张牌
+    const donorIdx = finishedOrder[2]; // 第三名
+    const receiverIdx = finishedOrder[1]; // 第二名
+    
+    // 设置进贡阶段状态（等待进贡）
+    this.state.tributePhase = {
+      type: 'pay', // 进贡阶段
+      payFrom: donorIdx, // 谁进贡
+      payTo: receiverIdx, // 给谁
+      count: 1 // 进贡几张
+    };
+    
+    // 如果进贡者是AI，自动处理
+    if (!this.state.players[donorIdx].isHuman) {
+      this.aiPayTribute(donorIdx, receiverIdx);
     }
+  },
+  
+  /**
+   * AI进贡逻辑
+   */
+  aiPayTribute(fromIdx, toIdx) {
+    const hand = this.state.players[fromIdx].hand;
+    // AI选择最大的牌进贡
+    const tributeCard = hand[0]; // 已排序，第一张最大
+    
+    if (tributeCard) {
+      hand.shift(); // 移除最大的牌
+      tributeCard.isTribute = true;
+      this.state.players[toIdx].hand.push(tributeCard);
+      this.state.players[toIdx].hand = Cards.sortByValue(this.state.players[toIdx].hand);
+      
+      // 进入回贡阶段
+      this.state.tributePhase = {
+        type: 'return',
+        returnFrom: toIdx,
+        returnTo: fromIdx,
+        tributeCard: tributeCard
+      };
+      
+      // 如果回贡者是AI，自动处理
+      if (!this.state.players[toIdx].isHuman) {
+        this.aiReturnTribute(toIdx, fromIdx);
+      }
+    }
+  },
+  
+  /**
+   * 玩家进贡
+   */
+  payTribute(cardId) {
+    if (!this.state.tributePhase || this.state.tributePhase.type !== 'pay') {
+      return { success: false, message: '不在进贡阶段' };
+    }
+    
+    const { payFrom, payTo } = this.state.tributePhase;
+    if (payFrom !== 0) {
+      return { success: false, message: '不是你进贡' };
+    }
+    
+    const hand = this.state.players[0].hand;
+    const cardIdx = hand.findIndex(c => c.id === cardId);
+    if (cardIdx < 0) {
+      return { success: false, message: '选择的牌不在手牌中' };
+    }
+    
+    const card = hand[cardIdx];
+    // 验证是否是最大的牌
+    // 检查手牌中是否有比这张牌大的
+    const maxVal = hand[0].value;
+    if (card.value < maxVal) {
+      return { success: false, message: '必须进贡最大的牌' };
+    }
+    
+    // 执行进贡
+    hand.splice(cardIdx, 1);
+    card.isTribute = true;
+    this.state.players[payTo].hand.push(card);
+    this.state.players[payTo].hand = Cards.sortByValue(this.state.players[payTo].hand);
+    
+    // 进入回贡阶段
+    this.state.tributePhase = {
+      type: 'return',
+      returnFrom: payTo,
+      returnTo: payFrom,
+      tributeCard: card
+    };
+    
+    // 如果回贡者是AI，自动处理
+    if (!this.state.players[payTo].isHuman) {
+      this.aiReturnTribute(payTo, payFrom);
+    }
+    
+    return { success: true, message: '进贡成功' };
+  },
+  
+  /**
+   * AI回贡逻辑
+   */
+  aiReturnTribute(fromIdx, toIdx) {
+    const hand = this.state.players[fromIdx].hand;
+    // AI选择最小的牌回贡
+    const returnCard = hand[hand.length - 1];
+    if (returnCard) {
+      hand.pop();
+      this.state.players[toIdx].hand.push(returnCard);
+      this.state.players[toIdx].hand = Cards.sortByValue(this.state.players[toIdx].hand);
+    }
+    this.state.tributePhase = null;
+  },
+  
+  /**
+   * 玩家回贡
+   */
+  returnTribute(cardId) {
+    if (!this.state.tributePhase || this.state.tributePhase.type !== 'return') {
+      return { success: false, message: '不在回贡阶段' };
+    }
+    
+    const { returnFrom, returnTo } = this.state.tributePhase;
+    if (returnFrom !== 0) {
+      return { success: false, message: '不是你回贡' };
+    }
+    
+    const hand = this.state.players[0].hand;
+    const cardIdx = hand.findIndex(c => c.id === cardId);
+    if (cardIdx < 0) {
+      return { success: false, message: '选择的牌不在手牌中' };
+    }
+    
+    const returnCard = hand.splice(cardIdx, 1)[0];
+    this.state.players[returnTo].hand.push(returnCard);
+    this.state.players[returnTo].hand = Cards.sortByValue(this.state.players[returnTo].hand);
+    
+    this.state.tributePhase = null;
+    return { success: true, message: '回贡成功' };
+  },
+  
+  /**
+   * 获取当前玩家
+   */
+  getCurrentPlayer() {
+    return this.state.players[this.state.currentPlayer];
+  },
+  
+  /**
+   * 玩家出牌
+   */
+  playCards(cardIds) {
+    if (this.state.currentPlayer !== 0) {
+      return { success: false, message: '还没轮到你' };
+    }
+    
+    const player = this.state.players[0];
+    const cards = cardIds.map(id => player.hand.find(c => c.id === id)).filter(Boolean);
+    
+    if (cards.length === 0) {
+      return { success: false, message: '请选择要出的牌' };
+    }
+    
+    const pattern = Patterns.detect(cards);
+    if (pattern.type === Patterns.TYPES.INVALID) {
+      return { success: false, message: '无效的牌型' };
+    }
+    
+    // 检查是否能压过上家
+    if (this.state.lastPlay && this.state.lastPlayIndex !== 0) {
+      if (!Patterns.canBeat(pattern, this.state.lastPlay)) {
+        return { success: false, message: '压不过上家的牌' };
+      }
+    }
+    
+    // 移除已出的牌
+    for (const card of cards) {
+      const idx = player.hand.findIndex(c => c.id === card.id);
+      if (idx >= 0) player.hand.splice(idx, 1);
+    }
+    
+    this.state.lastPlay = pattern;
+    this.state.lastPlayIndex = 0;
+    this.state.passCount = 0;
+    
+    // 炸弹加倍
+    if (pattern.isBomb) {
+      this.state.multiplier *= 2;
+    }
+    
+    // 检查是否出完
+    if (player.hand.length === 0) {
+      this.state.finishedOrder.push(0);
+      if (this.checkGameOver()) {
+        return { 
+          success: true, 
+          pattern, 
+          gameOver: true, 
+          isWin: true 
+        };
+      }
+    }
+    
+    this.selectedCards.clear();
+    this.nextPlayer();
+    
+    return { success: true, pattern };
+  },
+  
+  /**
+   * 玩家不要
+   */
+  pass() {
+    if (this.state.currentPlayer !== 0) {
+      return { success: false, message: '还没轮到你' };
+    }
+    
+    // 必须出牌的情况
+    if (this.state.lastPlayIndex === -1 || this.state.lastPlayIndex === 0) {
+      return { success: false, message: '你必须出牌' };
+    }
+    
+    this.state.passCount++;
+    this.selectedCards.clear();
+    this.nextPlayer();
+    
+    return { success: true };
+  },
+  
+  /**
+   * 获取提示
+   */
+  getHint() {
+    const player = this.state.players[0];
+    const lastPattern = (this.state.lastPlayIndex === 0 || this.state.lastPlayIndex === -1) 
+      ? null 
+      : this.state.lastPlay;
+    
+    return Patterns.getHints(player.hand, lastPattern);
+  },
+  
+  /**
+   * 切换到下一个玩家
+   */
+  nextPlayer() {
+    let nextIdx = (this.state.currentPlayer + 1) % 3;
+    
+    // 跳过已完成的玩家
+    let attempts = 0;
+    while (this.state.finishedOrder.includes(nextIdx) && attempts < 3) {
+      nextIdx = (nextIdx + 1) % 3;
+      attempts++;
+    }
+    
+    // 检查是否所有人都pass了
+    if (this.state.passCount >= 2) {
+      // 轮到出最后一手牌的人, 他可以自由出牌
+      this.state.lastPlay = null;
+      this.state.lastPlayIndex = -1;
+      this.state.passCount = 0;
+    }
+    
+    this.state.currentPlayer = nextIdx;
+  },
+  
+  /**
+   * AI出牌
+   */
+  async aiTurn() {
+    const playerIdx = this.state.currentPlayer;
+    const player = this.state.players[playerIdx];
+    
+    if (player.isHuman || this.state.finishedOrder.includes(playerIdx)) {
+      return null;
+    }
+    
+    await Utils.sleep(this.AI_DELAY);
+    
+    // 获取可出的牌
+    const lastPattern = (this.state.lastPlayIndex === -1 || this.state.lastPlayIndex === playerIdx) 
+      ? null 
+      : this.state.lastPlay;
+    
+    const hints = Patterns.getHints(player.hand, lastPattern);
+    
+    if (hints.length === 0) {
+      // 不出
+      this.state.passCount++;
+      this.nextPlayer();
+      return { type: 'pass', playerIdx };
+    }
+    
+    // 选择第一个提示
+    const cards = hints[0];
+    const pattern = Patterns.detect(cards);
+    
+    // 移除已出的牌
+    for (const card of cards) {
+      const idx = player.hand.findIndex(c => c.id === card.id);
+      if (idx >= 0) player.hand.splice(idx, 1);
+    }
+    
+    this.state.lastPlay = pattern;
+    this.state.lastPlayIndex = playerIdx;
+    this.state.passCount = 0;
+    
+    // 炸弹加倍
+    if (pattern.isBomb) {
+      this.state.multiplier *= 2;
+    }
+    
+    // 检查是否出完
+    let gameOver = false;
+    if (player.hand.length === 0) {
+      this.state.finishedOrder.push(playerIdx);
+      gameOver = this.checkGameOver();
+    }
+    
+    this.nextPlayer();
+    
     return {
-        gameId,
-        playerCount: opts.playerCount,
-        hands,
-        currentPlayer: firstPlayer,
-        lastPlay: null,
-        passesInRow: 0,
-        lastPlayOwner: null,
-        tablePlays: [],
-        currentTrickPlays: [],
-        finishedOrder: [],
-        revolution,
-        status: pendingReturns.length > 0 ? 'tribute_return' : 'playing',
-        pendingReturns,
-        multiplier: 1,
-        jiefengState: null,
+      type: 'play',
+      playerIdx,
+      cards,
+      pattern,
+      gameOver
     };
-}
-function removeCardsFromHand(hand, toRemove) {
-    const copy = [...hand];
-    for (const r of toRemove) {
-        const idx = copy.findIndex(c => c.rank === r.rank && c.suit === r.suit);
-        if (idx < 0) {
-            throw new Error('非法操作：出牌不在手牌中');
-        }
-        copy.splice(idx, 1);
-    }
-    return copy;
-}
-function nextActivePlayer(state, from) {
-    if (state.finishedOrder.length >= state.playerCount)
-        return -1;
-    let i = (from + 1) % state.playerCount;
-    let count = 0;
-    // skip finished players
-    while (state.finishedOrder.includes(i)) {
-        i = (i + 1) % state.playerCount;
-        count++;
-        if (count > state.playerCount)
-            return -1; // Safety break
-    }
-    return i;
-}
-function activePlayersCount(state) {
-    return state.playerCount - state.finishedOrder.length;
-}
-function labelPlay(p) { return p.label; }
-function isTwoFours(cards) {
-    if (cards.length !== 2)
-        return false;
-    return cards.every(c => !c.isJoker && c.rank === '4');
-}
-function isThreeFours(cards) {
-    if (cards.length !== 3)
-        return false;
-    return cards.every(c => !c.isJoker && c.rank === '4');
-}
-function playTurn(state, action) {
-    // Intentionally no console spam here; server already logs key lifecycle events.
-    if (state.finishedOrder.includes(state.currentPlayer)) {
-        // skip finished automatically
-        return { ...state, currentPlayer: nextActivePlayer(state, state.currentPlayer) };
-    }
-    if (action.type === 'pass') {
-        // 接风逻辑处理
-        if (state.jiefengState) {
-            const jf = state.jiefengState;
-            // 当前检查的玩家选择不压牌
-            const newSkipped = [...jf.skippedPlayers, state.currentPlayer];
-            // 找下一个要检查的玩家（跳过已经pass的、跑了的、以及下家）
-            let nextChecker = nextActivePlayer(state, state.currentPlayer);
-            // 如果转了一圈回到下家，或者只剩下家了，则下家接风
-            if (nextChecker === jf.nextPlayer || nextChecker === -1) {
-                // 接风成功：下家可以自由出牌
-                return {
-                    ...state,
-                    currentPlayer: jf.nextPlayer,
-                    lastPlay: null, // 自由出牌
-                    lastPlayOwner: null,
-                    passesInRow: 0,
-                    jiefengState: null,
-                    currentTrickPlays: [],
-                };
-            }
-            // 还有其他玩家需要检查
-            return {
-                ...state,
-                currentPlayer: nextChecker,
-                jiefengState: {
-                    ...jf,
-                    checkingPlayer: nextChecker,
-                    skippedPlayers: newSkipped,
-                },
-            };
-        }
-        // 正常pass逻辑
-        const next = nextActivePlayer(state, state.currentPlayer);
-        let lastPlay = state.lastPlay;
-        let lastPlayOwner = state.lastPlayOwner;
-        let passesInRow = state.passesInRow + 1;
-        // if everyone except lastPlayOwner has passed and we return to owner
-        // we DO NOT clear tablePlays here anymore, as requested.
-        // Only clear when game ends or new game starts.
-        let tablePlays = state.tablePlays ?? [];
-        let currentTrickPlays = state.currentTrickPlays ?? [];
-        if (state.lastPlay && next === state.lastPlay.by && passesInRow >= activePlayersCount(state) - 1) {
-            // Trick ends: clear lastPlay so the owner leads freely next.
-            // Keep tablePlays history for UI/record.
-            lastPlay = null;
-            lastPlayOwner = null;
-            passesInRow = 0;
-            currentTrickPlays = [];
-        }
-        return { ...state, currentPlayer: next, lastPlay, lastPlayOwner, passesInRow, tablePlays, currentTrickPlays, jiefengState: null };
-    }
-    // play cards
-    const hand = state.hands[state.currentPlayer];
-    const pattern = (0, patterns_1.detectPattern)(action.cards);
-    if (!pattern) {
-        throw new Error('非法牌型');
-    }
-    // 接风状态下有人选择出牌（压牌成功）：取消接风，正常继续游戏
-    // 接风状态下，压牌成功后，游戏继续正常流程
-    const wasInJiefeng = state.jiefengState !== null;
-    // Check if we are starting a new trick (because everyone passed back to us)
-    // BUT we must allow "Qi" logic to happen first if applicable.
-    let effectiveLastPlay = state.lastPlay;
-    if (state.lastPlay && state.lastPlay.by === state.currentPlayer) {
-        // Everyone passed back to me.
-        // I can either "Qi" (if valid) or start a new trick.
-        // We temporarily keep effectiveLastPlay to check for Qi.
-        // If Qi is NOT valid, we will set effectiveLastPlay to null later.
-    }
-    // 特殊起炸/起轰
-    if (effectiveLastPlay) {
-        let capturedCards = null;
-        let captureType = null;
-        let captureLabel = '';
-        if (effectiveLastPlay.type === 'TRIPLE' && isTwoFours(action.cards)) {
-            // 两张4可以起炸
-            capturedCards = effectiveLastPlay.cards;
-            captureType = 'PAIR';
-            captureLabel = '起炸: 4对';
-        }
-        // 起轰：三张4可以起轰（包括王轰）
-        const isHong = effectiveLastPlay.type === 'FOUR';
-        const isKingBomb = effectiveLastPlay.type === 'PAIR' && effectiveLastPlay.extra?.isKingBomb;
-        if ((isHong || isKingBomb) && isThreeFours(action.cards)) {
-            // 三张4可以起轰
-            capturedCards = effectiveLastPlay.cards;
-            captureType = 'TRIPLE';
-            captureLabel = '起轰: 4炸';
-        }
-        if (capturedCards && captureType) {
-            const newHand = removeCardsFromHand(hand, action.cards);
-            newHand.push(...capturedCards);
-            // Remove captured cards from tablePlays
-            // We need to find the TablePlay that corresponds to effectiveLastPlay
-            // effectiveLastPlay has 'by' and 'cards'.
-            // We look for a TablePlay with same 'by' and same cards.
-            const newTablePlays = (state.tablePlays ?? []).filter(tp => {
-                if (tp.by !== effectiveLastPlay.by)
-                    return true;
-                // Check if cards match
-                if (tp.cards.length !== capturedCards.length)
-                    return true;
-                // Simple check: compare first card rank/suit (assuming unique enough or exact object match if ref kept)
-                // Since we reconstruct objects, we compare content.
-                const match = tp.cards.every((c, i) => c.rank === capturedCards[i].rank && c.suit === capturedCards[i].suit);
-                return !match;
-            });
-            // Add the new play (the 4s)
-            newTablePlays.push({ by: state.currentPlayer, cards: action.cards });
-            // Update currentTrickPlays for Capture
-            // Remove captured cards from currentTrickPlays
-            const newCurrentTrickPlays = (state.currentTrickPlays ?? []).filter(tp => {
-                if (tp.by !== effectiveLastPlay.by)
-                    return true;
-                if (tp.cards.length !== capturedCards.length)
-                    return true;
-                const match = tp.cards.every((c, i) => c.rank === capturedCards[i].rank && c.suit === capturedCards[i].suit);
-                return !match;
-            });
-            newCurrentTrickPlays.push({ by: state.currentPlayer, cards: action.cards });
-            // Update Multiplier for Capture (Qi)
-            let newMultiplier = state.multiplier;
-            if (captureType === 'TRIPLE') { // Qi Hong (3 fours)
-                newMultiplier *= 4;
-            }
-            else if (captureType === 'PAIR') { // Qi Zha (2 fours)
-                newMultiplier *= 2;
-            }
-            const nextState = {
-                ...state,
-                hands: state.hands.map((h, idx) => idx === state.currentPlayer ? newHand.sort((a, b) => b.sortValue - a.sortValue) : h),
-                lastPlay: { type: captureType, cards: action.cards, label: captureLabel, strength: action.cards[0].sortValue, by: state.currentPlayer },
-                lastPlayOwner: state.currentPlayer,
-                passesInRow: 0,
-                currentPlayer: nextActivePlayer(state, state.currentPlayer),
-                tablePlays: newTablePlays,
-                currentTrickPlays: newCurrentTrickPlays,
-                multiplier: newMultiplier,
-                jiefengState: null, // 起炸/起轰时清除接风状态
-            };
-            return nextState;
-        }
-    }
-    // 正常比较逻辑
-    // If we are the owner of the last play (everyone passed), we start a new trick.
-    // So we treat effectiveLastPlay as null for comparison purposes.
-    let compareAgainst = effectiveLastPlay;
-    let isNewTrick = false;
-    if (compareAgainst) {
-        const isOwner = compareAgainst.by === state.currentPlayer;
-        const ownerFinished = state.finishedOrder.includes(compareAgainst.by);
-        const everyonePassed = state.passesInRow >= activePlayersCount(state) - 1;
-        if (isOwner || (ownerFinished && everyonePassed)) {
-            compareAgainst = null;
-            isNewTrick = true;
-        }
-    }
-    else {
-        isNewTrick = true;
-    }
-    if (compareAgainst) {
-        // 王炸识别为PAIR，但对比视作轰
-        const normalizedNext = (pattern.type === 'PAIR' && pattern.extra?.isKingBomb)
-            ? { ...pattern, type: 'FOUR', strength: Number.MAX_SAFE_INTEGER }
-            : pattern;
-        if (!(0, patterns_1.canBeat)(compareAgainst, normalizedNext)) {
-            throw new Error('无法压过上一手');
-        }
-    }
-    // remove played cards from hand
-    const newHand = removeCardsFromHand(hand, action.cards);
-    const newHands = state.hands.map((h, idx) => idx === state.currentPlayer ? newHand : h);
-    // check finished
-    let finishedOrder = state.finishedOrder;
-    if (newHand.length === 0 && !finishedOrder.includes(state.currentPlayer)) {
-        finishedOrder = [...finishedOrder, state.currentPlayer];
-    }
-    // Game End Check
-    if (state.playerCount - finishedOrder.length <= 1) {
-        const all = Array.from({ length: state.playerCount }, (_, i) => i);
-        const remaining = all.find(p => !finishedOrder.includes(p));
-        if (remaining !== undefined) {
-            finishedOrder = [...finishedOrder, remaining];
-        }
-    }
-    const newTablePlays = [...(state.tablePlays ?? []), { by: state.currentPlayer, cards: action.cards }];
-    let newCurrentTrickPlays = isNewTrick ? [] : [...(state.currentTrickPlays ?? [])];
-    newCurrentTrickPlays.push({ by: state.currentPlayer, cards: action.cards });
-    // Clear table plays only when game is over
-    let finalTablePlays = newTablePlays;
-    if (finishedOrder.length >= state.playerCount) {
-        finalTablePlays = [];
-        newCurrentTrickPlays = [];
-    }
-    // Calculate next player
-    const tempStateForNext = { ...state, finishedOrder };
-    let nextPlayer = -1;
-    if (finishedOrder.length < state.playerCount) {
-        nextPlayer = nextActivePlayer(tempStateForNext, state.currentPlayer);
-    }
-    // Update Multiplier
-    let newMultiplier = state.multiplier;
-    if (pattern.type === 'FOUR') {
-        newMultiplier *= 2; // Bomb x2
-    }
-    else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
-        newMultiplier *= 4; // King Bomb x4
-    }
-    // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
-    if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {
-        newMultiplier *= 2; // Additional x2 for 4s bomb (Total x4)
-    }
-    // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
-    let jiefengState = null;
-    const playerJustFinished = newHand.length === 0 && !state.finishedOrder.includes(state.currentPlayer);
-    if (playerJustFinished && finishedOrder.length < state.playerCount) {
-        // 玩家刚刚跑了，开始接风流程
-        const finishedPlayer = state.currentPlayer;
-        const lastPlayPattern = { ...pattern, by: state.currentPlayer };
-        // 找到下家（跑了的人的下一个未完成的玩家）
-        const nextAfterFinished = nextActivePlayer({ ...state, finishedOrder }, finishedPlayer);
-        if (nextAfterFinished !== -1) {
-            // 找到下家之后的下一个人来检查是否能压牌
-            const checkingPlayer = nextActivePlayer({ ...state, finishedOrder }, nextAfterFinished);
-            if (checkingPlayer !== -1 && checkingPlayer !== nextAfterFinished) {
-                // 有其他玩家需要检查，进入接风流程
-                jiefengState = {
-                    finishedPlayer,
-                    lastPlayCards: lastPlayPattern,
-                    nextPlayer: nextAfterFinished,
-                    checkingPlayer,
-                    skippedPlayers: [],
-                };
-                nextPlayer = checkingPlayer; // 先让检查的玩家决定是否要压
-            }
-            else {
-                // 只剩一个活跃玩家，直接接风
-                nextPlayer = nextAfterFinished;
-                // 不设置接风状态，因为这个玩家可以自由出牌（lastPlay会被清空）
-            }
-        }
-    }
-    const next = {
-        ...state,
-        hands: newHands,
-        lastPlay: jiefengState ? { ...pattern, by: state.currentPlayer } : { ...pattern, by: state.currentPlayer },
-        lastPlayOwner: state.currentPlayer,
-        passesInRow: 0,
-        currentPlayer: nextPlayer,
-        finishedOrder,
-        tablePlays: finalTablePlays,
-        currentTrickPlays: newCurrentTrickPlays,
-        multiplier: newMultiplier,
-        jiefengState,
-    };
-    return next;
-}
-function forceWin(state, playerIndex) {
-    // Empty hand
-    const newHands = state.hands.map((h, i) => i === playerIndex ? [] : h);
-    // Add to finishedOrder
-    let finishedOrder = [...state.finishedOrder];
-    if (!finishedOrder.includes(playerIndex)) {
-        finishedOrder.push(playerIndex);
-    }
-    // Check if game should end (auto-finish last player)
-    if (state.playerCount - finishedOrder.length <= 1) {
-        const all = Array.from({ length: state.playerCount }, (_, i) => i);
-        const remaining = all.find(p => !finishedOrder.includes(p));
-        if (remaining !== undefined) {
-            finishedOrder.push(remaining);
-        }
-    }
-    // Determine next player if game not over
-    let nextPlayer = state.currentPlayer;
-    if (finishedOrder.length < state.playerCount) {
-        // If current player was the one who forced win, pass turn to next active
-        if (state.currentPlayer === playerIndex) {
-            nextPlayer = nextActivePlayer({ ...state, finishedOrder }, playerIndex);
-        }
-    }
-    else {
-        nextPlayer = -1;
-    }
-    return {
-        ...state,
-        hands: newHands,
-        finishedOrder,
-        currentPlayer: nextPlayer,
-        passesInRow: 0, // Reset passes
-        lastPlay: null, // Reset last play to allow next player to lead freely? Or keep it? 
-        // If I force win, I'm "out". The next player should probably start fresh or continue?
-        // Simpler: Reset to free play for next person.
-        lastPlayOwner: null,
-        tablePlays: [], // Clear table
-        currentTrickPlays: [],
-        jiefengState: null, // 清除接风状态
-    };
-}
-function checkRevolution(hands, finishedOrder) {
-    // 革命逻辑：当需要进贡的一个人手里有了王轰，则这进贡的所有人都不需要进贡了
-    // 需要进贡的人：
-    // 4人局：第3名（给第2名），第4名（给第1名）。
-    // 3人局：第3名（给第2名，第1名不需要进贡？规则只说了第3给第2，第4给第1。3人局通常是第3给第1？用户规则：“第三个跑了的人要把牌中最大的一张给第二个跑了的人...第四个跑了的人要把牌中最大的两张张给第一个跑了的人”）
-    // 用户规则描述有点混淆，通常3人局是末游给上游。
-    // 按照用户文字：“第三个跑了的人...给第二个...第四个...给第一个”。
-    // 假设3人局只有前半句：第3给第2？这有点奇怪，通常是给第1。
-    // 但严格按用户文字：
-    // 3人局：finishedOrder[2] 是第三个跑了的人。他需要进贡。
-    // 4人局：finishedOrder[2] 和 finishedOrder[3] 是需要进贡的人。
-    // 检查这些“需要进贡的人”手里是否有王轰。
-    // 注意：此时是“下一局开始随机分完牌的时候”。所以我们要检查的是新发的手牌。
-    const playerCount = hands.length;
-    const potentialDonors = [];
-    if (playerCount >= 3)
-        potentialDonors.push(finishedOrder[2]);
-    if (playerCount >= 4)
-        potentialDonors.push(finishedOrder[3]);
-    for (const pIdx of potentialDonors) {
-        // 检查 hands[pIdx] 是否有王轰 (大王 + 小王)
-        const hasBig = hands[pIdx].some(c => c.rank === 'JOKER_BIG');
-        const hasSmall = hands[pIdx].some(c => c.rank === 'JOKER_SMALL');
-        if (hasBig && hasSmall)
-            return true;
+  },
+  
+  /**
+   * 检查游戏是否结束
+   */
+  checkGameOver() {
+    // 只剩一个人没出完就结束
+    const remaining = [0, 1, 2].filter(i => !this.state.finishedOrder.includes(i));
+    if (remaining.length <= 1) {
+      if (remaining.length === 1) {
+        this.state.finishedOrder.push(remaining[0]);
+      }
+      this.state.status = 'finished';
+      return true;
     }
     return false;
-}
-function computeTributePlan(playerCount, finishedOrder, isRevolution) {
-    if (isRevolution) {
-        return { donorToReceiver: [], revolution: true };
-    }
-    const donors = [];
-    // 规则：“第三个跑了的人要把牌中最大的一张给第二个跑了的人”
-    if (playerCount >= 3 && finishedOrder.length >= 3) {
-        donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
-    }
-    // 规则：“第四个跑了的人要把牌中最大的两张张给第一个跑了的人”
-    if (playerCount >= 4 && finishedOrder.length >= 4) {
-        donors.push({ donor: finishedOrder[3], receiver: finishedOrder[0], count: 2 });
-    }
-    return { donorToReceiver: donors, revolution: false };
-}
-// 执行进贡（自动）：把 donor 最大的牌给 receiver
-function applyTribute(hands, plan) {
-    const newHands = hands.map(h => [...h]);
-    for (const { donor, receiver, count } of plan.donorToReceiver) {
-        // 找出 donor 最大的 count 张牌
-        // 假设 hand 已经排好序（大到小）
-        // 再次排序确保万一
-        newHands[donor].sort((a, b) => b.sortValue - a.sortValue);
-        const tributes = newHands[donor].slice(0, count);
-        // 从 donor 移除
-        newHands[donor] = newHands[donor].slice(count);
-        // 给 receiver
-        // Mark as tribute
-        tributes.forEach(c => c.isTribute = true);
-        newHands[receiver].push(...tributes);
-    }
-    // 重新排序所有手牌
-    for (let i = 0; i < newHands.length; i++) {
-        newHands[i].sort((a, b) => b.sortValue - a.sortValue);
-    }
-    return newHands;
-}
-// 执行回贡（手动）：receiver 选择牌还给 donor
-function returnTribute(hands, donor, receiver, cards) {
-    const newHands = hands.map(h => [...h]);
-    // 从 receiver 移除 cards
-    const rHand = newHands[receiver];
-    const newRHand = removeCardsFromHand(rHand, cards);
-    if (newRHand.length !== rHand.length - cards.length) {
-        throw new Error('回贡牌不在手牌中');
-    }
-    newHands[receiver] = newRHand;
-    // 给 donor
-    newHands[donor].push(...cards);
-    // 排序
-    newHands[donor].sort((a, b) => b.sortValue - a.sortValue);
-    newHands[receiver].sort((a, b) => b.sortValue - a.sortValue);
-    return newHands;
-}
-function resolveReturnTribute(state, playerId, cards) {
-    if (state.status !== 'tribute_return')
-        throw new Error('Not in tribute return phase');
-    const pendingIdx = state.pendingReturns.findIndex(p => p.actionBy === playerId);
-    if (pendingIdx === -1)
-        throw new Error('You do not need to return tribute');
-    const pending = state.pendingReturns[pendingIdx];
-    if (cards.length !== pending.count)
-        throw new Error(`Must return exactly ${pending.count} cards`);
-    // Use existing returnTribute helper
-    const newHands = returnTribute(state.hands, pending.returnTo, pending.actionBy, cards);
-    // Remove from pendingReturns
-    const newPending = [...state.pendingReturns];
-    newPending.splice(pendingIdx, 1);
-    const nextStatus = newPending.length === 0 ? 'playing' : 'tribute_return';
-    // If phase ended, clear all tribute flags
-    if (nextStatus === 'playing') {
-        for (const h of newHands) {
-            for (const c of h) {
-                delete c.isTribute;
-            }
-        }
-    }
-    return {
-        ...state,
-        hands: newHands,
-        pendingReturns: newPending,
-        status: nextStatus
+  },
+  
+  /**
+   * 获取游戏结果
+   */
+  getResult() {
+    const isWin = this.state.finishedOrder[0] === 0;
+    const scores = this.state.players.map((p, i) => {
+      const rank = this.state.finishedOrder.indexOf(i);
+      let score = 0;
+      if (rank === 0) score = 100 * this.state.multiplier;
+      else if (rank === 1) score = 0;
+      else score = -50 * this.state.multiplier;
+      
+      return { name: p.name, score, rank: rank + 1 };
+    });
+    
+    // 保存这一局结果用于下一局进贡
+    this.lastRoundResult = {
+      finishedOrder: [...this.state.finishedOrder],
+      multiplier: this.state.multiplier
     };
-}
-function hasValidMove(hand, lastPlay) {
-    if (!lastPlay)
-        return hand.length > 0; // Free turn, any card is valid (if hand not empty)
-    // Check for Bomb (Four) or King Bomb - they can beat almost anything
-    // King Bomb
-    const hasBig = hand.some(c => c.rank === 'JOKER_BIG');
-    const hasSmall = hand.some(c => c.rank === 'JOKER_SMALL');
-    if (hasBig && hasSmall)
-        return true;
-    // Four (Bomb)
-    const counts = new Map();
-    for (const c of hand) {
-        if (!c.isJoker)
-            counts.set(c.rank, (counts.get(c.rank) || 0) + 1);
+    
+    return { isWin, scores, multiplier: this.state.multiplier };
+  },
+  
+  /**
+   * 切换选中状态
+   */
+  toggleSelectCard(cardId) {
+    if (this.selectedCards.has(cardId)) {
+      this.selectedCards.delete(cardId);
+    } else {
+      this.selectedCards.add(cardId);
     }
-    // Check for "Qi" (Capture) possibilities
-    if (lastPlay) {
-        // Pair of 4s can capture Triple
-        if (lastPlay.type === 'TRIPLE') {
-            const fours = counts.get('4') || 0;
-            if (fours >= 2)
-                return true;
-        }
-        // Triple 4s can capture Bomb (Four) or King Bomb
-        if (lastPlay.type === 'FOUR' || (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb)) {
-            const fours = counts.get('4') || 0;
-            if (fours >= 3)
-                return true;
-        }
+    return Array.from(this.selectedCards);
+  },
+  
+  /**
+   * 清空选中
+   */
+  clearSelection() {
+    this.selectedCards.clear();
+  },
+  
+  /**
+   * 选中提示的牌
+   */
+  selectHint(hint) {
+    this.selectedCards.clear();
+    for (const card of hint) {
+      this.selectedCards.add(card.id);
     }
-    // Iterate all ranks to find bombs and check strength against lastPlay
-    for (const [rank, count] of counts.entries()) {
-        if (count === 4) {
-            // Construct a temp pattern
-            const bombStrength = (0, cards_1.makeCard)(rank).sortValue;
-            if (lastPlay.type === 'FOUR') {
-                if (bombStrength > lastPlay.strength)
-                    return true;
-            }
-            else if (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb) {
-                // Bomb cannot beat King Bomb
-            }
-            else {
-                return true; // Bomb beats anything else
-            }
-        }
-    }
-    // If lastPlay is King Bomb, nothing can beat it (except maybe special rules? No, King Bomb is max).
-    if (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb)
-        return false;
-    // Check same type
-    if (lastPlay.type === 'SINGLE') {
-        // Check if any single card > strength
-        return hand.some(c => c.sortValue > lastPlay.strength);
-    }
-    if (lastPlay.type === 'PAIR') {
-        // Check if any pair > strength
-        for (const [rank, count] of counts.entries()) {
-            if (count >= 2) {
-                const s = (0, cards_1.makeCard)(rank).sortValue;
-                if (s > lastPlay.strength)
-                    return true;
-            }
-        }
-    }
-    if (lastPlay.type === 'TRIPLE') {
-        // Check if any triple > strength
-        for (const [rank, count] of counts.entries()) {
-            if (count >= 3) {
-                const s = (0, cards_1.makeCard)(rank).sortValue;
-                if (s > lastPlay.strength)
-                    return true;
-            }
-        }
-    }
-    // STRAIGHT / DOUBLE_SEQUENCE: check if we can form a same-length sequence with higher strength.
-    if (lastPlay.type === 'STRAIGHT' && lastPlay.extra?.straightLength) {
-        const len = lastPlay.extra.straightLength;
-        const normalUniqueRanks = Array.from(counts.keys());
-        const runs = (0, cards_1.findStraightRuns)(normalUniqueRanks);
-        for (const run of runs) {
-            if (run.length < len)
-                continue;
-            for (let start = 0; start + len <= run.length; start++) {
-                const seq = run.slice(start, start + len);
-                const strength = (0, cards_1.straightStartValue)(seq);
-                if (strength > lastPlay.strength)
-                    return true;
-            }
-        }
-        return false;
-    }
-    if (lastPlay.type === 'DOUBLE_SEQUENCE' && lastPlay.extra?.straightLength) {
-        const pairLen = lastPlay.extra.straightLength;
-        // Reuse outer counts map
-        const pairRanks = Array.from(counts.entries())
-            .filter(([r, n]) => n >= 2)
-            .map(([r]) => r);
-        const runs = (0, cards_1.findStraightRuns)(pairRanks);
-        for (const run of runs) {
-            if (run.length < pairLen)
-                continue;
-            for (let start = 0; start + pairLen <= run.length; start++) {
-                const seq = run.slice(start, start + pairLen);
-                const strength = (0, cards_1.straightStartValue)(seq);
-                if (strength > lastPlay.strength)
-                    return true;
-            }
-        }
-        return false;
-    }
-    return false;
+    return Array.from(this.selectedCards);
+  }
+};
+
+// 导出
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Game;
 }

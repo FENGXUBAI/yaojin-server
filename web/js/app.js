@@ -397,7 +397,22 @@ const App = {
     // 先渲染基本界面
     this.renderGame();
     
-    if (phase.type === 'return' && phase.returnFrom === 0) {
+    if (phase.type === 'pay' && phase.payFrom === 0) {
+      // 玩家需要进贡
+      this.showNotification('请选择最大的牌进贡', 5000);
+      
+      // 更新按钮为进贡模式
+      const playBtn = document.getElementById('btn-play');
+      const passBtn = document.getElementById('btn-pass');
+      
+      if (playBtn) {
+        playBtn.textContent = '进贡';
+        playBtn.onclick = () => this.doPayTribute();
+      }
+      if (passBtn) {
+        passBtn.classList.add('hidden');
+      }
+    } else if (phase.type === 'return' && phase.returnFrom === 0) {
       // 玩家需要回贡
       this.showNotification(`你收到了进贡牌 ${Cards.formatCard(phase.tributeCard)}，请选择一张牌回贡`, 5000);
       
@@ -413,8 +428,44 @@ const App = {
         passBtn.classList.add('hidden');
       }
     } else {
-      // AI已自动处理回贡
+      // AI已自动处理
       this.showNotification('进贡回贡完成', 2000);
+      
+      // 如果不是玩家回合，触发AI
+      if (Game.state.currentPlayer !== 0) {
+        this.runAI();
+      } else {
+        Sound.play('my_turn');
+      }
+    }
+  },
+  
+  /**
+   * 执行进贡
+   */
+  doPayTribute() {
+    const selected = Array.from(Game.selectedCards);
+    if (selected.length !== 1) {
+      this.showNotification('请选择一张牌进贡', 2000);
+      return;
+    }
+    
+    const result = Game.payTribute(selected[0]);
+    if (!result.success) {
+      this.showNotification(result.message, 2000);
+      return;
+    }
+    
+    Sound.play('card_play');
+    this.showNotification('进贡成功', 1500);
+    
+    // 检查是否进入回贡阶段
+    if (Game.state.tributePhase && Game.state.tributePhase.type === 'return') {
+      this.showTributePhase();
+    } else {
+      // 恢复正常按钮
+      this.resetButtons();
+      this.renderGame();
       
       // 如果不是玩家回合，触发AI
       if (Game.state.currentPlayer !== 0) {
@@ -445,16 +496,7 @@ const App = {
     this.showNotification('回贡成功', 1500);
     
     // 恢复正常按钮
-    const playBtn = document.getElementById('btn-play');
-    const passBtn = document.getElementById('btn-pass');
-    
-    if (playBtn) {
-      playBtn.textContent = '出牌';
-      playBtn.onclick = () => this.playCards();
-    }
-    if (passBtn) {
-      passBtn.classList.remove('hidden');
-    }
+    this.resetButtons();
     
     // 重新渲染
     this.renderGame();
@@ -464,6 +506,22 @@ const App = {
       this.runAI();
     } else {
       Sound.play('my_turn');
+    }
+  },
+  
+  /**
+   * 重置按钮状态
+   */
+  resetButtons() {
+    const playBtn = document.getElementById('btn-play');
+    const passBtn = document.getElementById('btn-pass');
+    
+    if (playBtn) {
+      playBtn.textContent = '出牌';
+      playBtn.onclick = () => this.playCards();
+    }
+    if (passBtn) {
+      passBtn.classList.remove('hidden');
     }
   },
   
@@ -499,12 +557,19 @@ const App = {
       return;
     }
     
+    // 如果是第一次渲染（或者手牌数量变化很大，比如刚发牌），使用动画
+    // 这里简单判断：如果容器为空，则使用发牌动画
+    if (container.children.length === 0 && Game.state.players[0].hand.length > 0) {
+      this.animateDeal(container);
+      return;
+    }
+    
     container.innerHTML = '';
     
     const hand = Game.state.players[0].hand;
     hand.forEach((card, index) => {
       const cardEl = Cards.createCardElement(card);
-      cardEl.style.animationDelay = `${index * 0.03}s`;
+      // cardEl.style.animationDelay = `${index * 0.03}s`; // 移除默认CSS动画延迟，由JS控制
       
       if (Game.selectedCards.has(card.id)) {
         cardEl.classList.add('selected');
@@ -520,6 +585,44 @@ const App = {
     // 更新手牌数量
     const countEl = document.getElementById('hand-count');
     if (countEl) countEl.textContent = hand.length;
+  },
+  
+  /**
+   * 发牌动画
+   */
+  animateDeal(container) {
+    container.innerHTML = '';
+    const hand = Game.state.players[0].hand;
+    
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i >= hand.length) {
+        clearInterval(interval);
+        // 动画结束后，重新绑定事件等（虽然这里已经绑定了）
+        return;
+      }
+      
+      const card = hand[i];
+      const cardEl = Cards.createCardElement(card);
+      cardEl.classList.add('dealing'); // 可以添加一个特殊的动画类
+      
+      if (Game.selectedCards.has(card.id)) {
+        cardEl.classList.add('selected');
+      }
+      
+      cardEl.addEventListener('click', () => {
+        this.onCardClick(card);
+      });
+      
+      container.appendChild(cardEl);
+      
+      // 播放发牌音效
+      if (i % 2 === 0) { // 每两张播放一次，避免太吵
+        Sound.play('deal'); 
+      }
+      
+      i++;
+    }, 100); // 每100ms发一张
   },
   
   /**

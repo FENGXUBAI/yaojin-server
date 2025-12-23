@@ -100,33 +100,96 @@ const Game = {
     const donorIdx = finishedOrder[2]; // 第三名
     const receiverIdx = finishedOrder[1]; // 第二名
     
-    const donorHand = this.state.players[donorIdx].hand;
-    const receiverHand = this.state.players[receiverIdx].hand;
+    // 设置进贡阶段状态（等待进贡）
+    this.state.tributePhase = {
+      type: 'pay', // 进贡阶段
+      payFrom: donorIdx, // 谁进贡
+      payTo: receiverIdx, // 给谁
+      count: 1 // 进贡几张
+    };
     
-    // 取出最大的牌（已排序，第一张最大）
-    const tributeCard = donorHand.shift();
+    // 如果进贡者是AI，自动处理
+    if (!this.state.players[donorIdx].isHuman) {
+      this.aiPayTribute(donorIdx, receiverIdx);
+    }
+  },
+  
+  /**
+   * AI进贡逻辑
+   */
+  aiPayTribute(fromIdx, toIdx) {
+    const hand = this.state.players[fromIdx].hand;
+    // AI选择最大的牌进贡
+    const tributeCard = hand[0]; // 已排序，第一张最大
+    
     if (tributeCard) {
-      tributeCard.isTribute = true; // 标记为进贡牌
-      receiverHand.push(tributeCard);
-      // 重新排序
-      this.state.players[receiverIdx].hand = Cards.sortByValue(receiverHand);
+      hand.shift(); // 移除最大的牌
+      tributeCard.isTribute = true;
+      this.state.players[toIdx].hand.push(tributeCard);
+      this.state.players[toIdx].hand = Cards.sortByValue(this.state.players[toIdx].hand);
+      
+      // 进入回贡阶段
+      this.state.tributePhase = {
+        type: 'return',
+        returnFrom: toIdx,
+        returnTo: fromIdx,
+        tributeCard: tributeCard
+      };
+      
+      // 如果回贡者是AI，自动处理
+      if (!this.state.players[toIdx].isHuman) {
+        this.aiReturnTribute(toIdx, fromIdx);
+      }
+    }
+  },
+  
+  /**
+   * 玩家进贡
+   */
+  payTribute(cardId) {
+    if (!this.state.tributePhase || this.state.tributePhase.type !== 'pay') {
+      return { success: false, message: '不在进贡阶段' };
     }
     
-    // 设置进贡阶段状态（等待回贡）
+    const { payFrom, payTo } = this.state.tributePhase;
+    if (payFrom !== 0) {
+      return { success: false, message: '不是你进贡' };
+    }
+    
+    const hand = this.state.players[0].hand;
+    const cardIdx = hand.findIndex(c => c.id === cardId);
+    if (cardIdx < 0) {
+      return { success: false, message: '选择的牌不在手牌中' };
+    }
+    
+    const card = hand[cardIdx];
+    // 验证是否是最大的牌
+    // 检查手牌中是否有比这张牌大的
+    const maxVal = hand[0].value;
+    if (card.value < maxVal) {
+      return { success: false, message: '必须进贡最大的牌' };
+    }
+    
+    // 执行进贡
+    hand.splice(cardIdx, 1);
+    card.isTribute = true;
+    this.state.players[payTo].hand.push(card);
+    this.state.players[payTo].hand = Cards.sortByValue(this.state.players[payTo].hand);
+    
+    // 进入回贡阶段
     this.state.tributePhase = {
-      type: 'return', // 回贡阶段
-      returnFrom: receiverIdx, // 从谁回贡
-      returnTo: donorIdx, // 回给谁
-      tributeCard: tributeCard // 进贡的牌
+      type: 'return',
+      returnFrom: payTo,
+      returnTo: payFrom,
+      tributeCard: card
     };
     
     // 如果回贡者是AI，自动处理
-    if (!this.state.players[receiverIdx].isHuman) {
-      this.aiReturnTribute(receiverIdx, donorIdx);
+    if (!this.state.players[payTo].isHuman) {
+      this.aiReturnTribute(payTo, payFrom);
     }
     
-    // 无革命：最后一名先出
-    this.state.currentPlayer = finishedOrder[2];
+    return { success: true, message: '进贡成功' };
   },
   
   /**
