@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client'
 class GameSocket {
   private socket: Socket | null = null
   private static instance: GameSocket
+  private baseListenersBound = false
 
   private constructor() {}
 
@@ -14,31 +15,48 @@ class GameSocket {
   }
 
   public connect(url: string = '/') {
-    if (this.socket?.connected) return
+    // Reuse existing socket instance to avoid creating parallel connections
+    // that can cause the old (room owner) socket to disconnect immediately.
+    if (this.socket) {
+      if (!this.socket.connected) {
+        this.socket.connect()
+      }
+      return
+    }
 
     this.socket = io(url, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      // Keep connection alive across page navigation
+      forceNew: false,
     })
 
-    this.socket.on('connect', () => {
-      console.log('Socket connected:', this.socket?.id)
-    })
+    if (!this.baseListenersBound) {
+      this.baseListenersBound = true
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason)
-    })
+      this.socket.on('connect', () => {
+        console.log('Socket connected:', this.socket?.id)
+      })
 
-    this.socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err)
-    })
+      this.socket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason)
+      })
+
+      this.socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err)
+      })
+    }
   }
 
   public disconnect() {
     if (this.socket) {
       this.socket.disconnect()
       this.socket = null
+      this.baseListenersBound = false
     }
   }
 

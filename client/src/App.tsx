@@ -4,17 +4,22 @@ import Lobby from './pages/Lobby'
 import Room from './pages/Room'
 import Profile from './pages/Profile'
 import { Toaster } from 'react-hot-toast'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useGameStore } from '@/store/gameStore'
 
 function App() {
-  const connect = useGameStore(state => state.connect)
-  const disconnect = useGameStore(state => state.disconnect)
+  const connectRef = useRef(false)
 
   useEffect(() => {
-    connect()
-    return () => disconnect()
-  }, [connect, disconnect])
+    // Only connect once on app mount
+    if (!connectRef.current) {
+      connectRef.current = true
+      useGameStore.getState().connect()
+    }
+    
+    // Don't disconnect on unmount - keep connection alive
+    // Socket will auto-reconnect if needed
+  }, [])
 
   return (
     <BrowserRouter>

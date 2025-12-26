@@ -336,6 +336,7 @@ app.get('/api/room/:roomId', (req, res) => {
 
 // ============== 静态文件服务 ==============
 
+<<<<<<< HEAD
 // Serve static files - prioritize public/ folder (new React client) over legacy paths
 // Priority:
 // 1. public/ at current dir (server/server/public - new React client)
@@ -354,9 +355,28 @@ const possiblePaths = [
 let distPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
 
 console.log('[Static] Serving files from:', distPath);
+=======
+const fs = require('fs');
+
+// Priority order for static files:
+// 1. public/ at repo root (new React client)
+// 2. ../public (when running from dist-server/)
+// 3. dist/ fallback (old web/)
+
+const possiblePaths = [
+  path.join(__dirname, 'public'),        // dev: yaojin/public
+  path.join(__dirname, '../public'),     // prod: dist-server/../public = yaojin/public
+  path.join(__dirname, 'dist'),          // old fallback: yaojin/dist or dist-server/dist
+];
+
+let staticPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
+
+console.log(`[Static] Checking paths: ${possiblePaths.join(', ')}`);
+console.log(`[Static] Serving files from: ${staticPath}`);
+>>>>>>> 0fc789e (fix: prevent socket reconnect from killing room)
 
 app.use(
-  express.static(distPath, {
+  express.static(staticPath, {
     etag: false,
     lastModified: false,
     setHeaders: (res) => {
@@ -367,7 +387,7 @@ app.use(
 
 // Fallback to index.html for SPA routing (if any)
 // Only send file if it exists, otherwise return 404
-const indexPath = path.join(distPath, 'index.html');
+const indexPath = path.join(staticPath, 'index.html');
 app.use((req, res) => {
   // Skip API routes that weren't matched
   if (req.path.startsWith('/api/')) {
@@ -384,12 +404,12 @@ app.use((req, res) => {
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
   },
-  // Improve connection stability
-  pingTimeout: 60000,    // 60 seconds before considering connection dead
-  pingInterval: 25000,   // Send ping every 25 seconds
-  transports: ['websocket', 'polling'],  // Prefer WebSocket but fallback to polling
+  // Improve connection stability (especially behind reverse proxies)
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'],
   allowUpgrades: true,
 });
 
@@ -671,7 +691,7 @@ function emitPrivateState(r: Room) {
 }
 
 io.on('connection', (socket: Socket) => {
-  console.log('Client connected:', socket.id);
+  console.log('Client connected:', socket.id, 'transport:', socket.conn.transport.name);
 
   socket.on('listRooms', () => {
     if (isRateLimited(socket.id, 1000)) return;
@@ -704,6 +724,13 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('join', ({ room, name, clientKey, lastSfxSeq, lastMvpSeq }: { room: string; name: string; clientKey?: string; lastSfxSeq?: number; lastMvpSeq?: number }) => {
     if (isRateLimited(socket.id, 200)) return;
+    console.log('[join] request', {
+      socketId: socket.id,
+      room,
+      name,
+      hasClientKey: !!(clientKey && String(clientKey).trim()),
+      transport: socket.conn.transport.name,
+    });
     socket.join(room);
     let r = rooms.get(room);
     if (!r) {
@@ -1100,9 +1127,9 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  socket.on('disconnect', (reason) => {
     const room = socketRoom.get(socket.id);
+    console.log('Client disconnected:', socket.id, 'reason:', reason, 'transport:', socket.conn.transport.name, 'room:', room);
     socketRoom.delete(socket.id);
     socketClientKey.delete(socket.id);
     if (!room) return;

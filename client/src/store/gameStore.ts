@@ -4,6 +4,8 @@ import { Room, GameState, RoomStatePayload, Card } from '@/types'
 import { useUserStore } from './userStore'
 import toast from 'react-hot-toast'
 
+let listenersBound = false
+
 interface GameStore {
   room: Room | null
   gameState: GameState | null
@@ -35,47 +37,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   connect: () => {
     gameSocket.connect()
-    
-    // Setup listeners
-    gameSocket.on('connect', () => {
-      set({ isConnected: true })
-    })
-    
-    gameSocket.on('disconnect', () => {
-      set({ isConnected: false })
-    })
-    
-    gameSocket.on('roomState', (data: RoomStatePayload) => {
-      get().handleRoomState(data)
-    })
-    
-    gameSocket.on('gameState', (data: GameState) => {
-      get().handleGameState(data)
-    })
 
-    gameSocket.on('privateState', (data: { myIndex: number, hand: Card[], gameState: GameState }) => {
-      const { myIndex, hand, gameState: publicState } = data
-      
-      // Reconstruct hands array
-      const hands = new Array(publicState.playerCount).fill([])
-      hands[myIndex] = hand
-      
-      const fullState = {
-        ...publicState,
-        hands
-      }
-      
-      set({ gameState: fullState })
-    })
+    // Setup listeners only once
+    if (!listenersBound) {
+      listenersBound = true
 
-    gameSocket.on('error', (msg: string) => {
-      toast.error(msg)
-    })
-    
-    gameSocket.on('gameOver', () => {
-      toast.success('游戏结束!', { icon: '🏁' })
-      // 可以弹窗显示结算
-    })
+      gameSocket.on('connect', () => {
+        set({ isConnected: true })
+      })
+
+      gameSocket.on('disconnect', () => {
+        set({ isConnected: false })
+      })
+
+      gameSocket.on('roomState', (data: RoomStatePayload) => {
+        get().handleRoomState(data)
+      })
+
+      gameSocket.on('gameState', (data: GameState) => {
+        get().handleGameState(data)
+      })
+
+      gameSocket.on('privateState', (data: { myIndex: number, hand: Card[], gameState: GameState }) => {
+        const { myIndex, hand, gameState: publicState } = data
+
+        // Reconstruct hands array
+        const hands = new Array(publicState.playerCount).fill([])
+        hands[myIndex] = hand
+
+        const fullState = {
+          ...publicState,
+          hands
+        }
+
+        set({ gameState: fullState })
+      })
+
+      gameSocket.on('error', (msg: string) => {
+        toast.error(msg)
+      })
+
+      gameSocket.on('gameOver', () => {
+        toast.success('游戏结束!', { icon: '🏁' })
+        // 可以弹窗显示结算
+      })
+    }
   },
 
   disconnect: () => {
