@@ -99,7 +99,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
-    set({ clientKey: data.clientKey })
+    
+    // Pre-set room info so handleRoomState can use it
+    set({ 
+      clientKey: data.clientKey,
+      room: {
+        id: data.roomId,
+        players: [],
+        playerCount: playerCount,
+        ownerId: '',
+        status: 'waiting',
+        gameState: null
+      }
+    })
     
     // Socket join
     gameSocket.emit('join', {
@@ -128,7 +140,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
-    set({ clientKey: data.clientKey })
+    
+    // Pre-set room info
+    set({ 
+      clientKey: data.clientKey,
+      room: {
+        id: roomId,
+        players: [],
+        playerCount: 3, // Will be updated by roomState
+        ownerId: '',
+        status: 'waiting',
+        gameState: null
+      }
+    })
 
     // 2. Socket Join
     gameSocket.emit('join', {
@@ -154,7 +178,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
-    set({ clientKey: data.clientKey })
+    
+    // Pre-set room info
+    set({ 
+      clientKey: data.clientKey,
+      room: {
+        id: data.roomId,
+        players: [],
+        playerCount: 3,
+        ownerId: '',
+        status: 'waiting',
+        gameState: null
+      }
+    })
 
     gameSocket.emit('join', {
       room: data.roomId,
@@ -203,17 +239,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   handleRoomState: (data: RoomStatePayload) => {
     const currentRoom = get().room
+    const roomId = currentRoom?.id || 'UNKNOWN'
+    const playerCount = currentRoom?.playerCount ?? data.players?.length ?? 3
+    
+    console.log('[GameStore] handleRoomState:', { roomId, playerCount, players: data.players?.length })
+    
     set({ 
       room: {
-        id: currentRoom?.id || 'UNKNOWN',
-        playerCount: currentRoom?.playerCount ?? 3,
-        ...(currentRoom || {}),
-        players: data.players,
-        ownerId: data.owner,
+        id: roomId,
+        playerCount: playerCount,
+        players: data.players || [],
+        ownerId: data.owner || '',
         status: data.gameState ? 'playing' : 'waiting',
-        gameState: data.gameState
+        gameState: data.gameState || null
       },
-      gameState: data.gameState
+      gameState: data.gameState || null
     })
   },
 
