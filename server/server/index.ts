@@ -387,18 +387,21 @@ app.get('/api/room/:roomId', (req, res) => {
 
 const fs = require('fs');
 
-// Try to serve from 'public' (New React Client) first
-// In dev: __dirname is server/server. public is server/server/public
-// In prod: __dirname is server/server/dist-server. public is server/server/public (../public)
-const publicPath = process.env.NODE_ENV === 'production' 
-  ? path.join(__dirname, '../public') 
-  : path.join(__dirname, 'public');
+// Priority order for static files:
+// 1. public/ at current dir (server/server/public - new React client)
+// 2. ../public (when running from dist-server/)
+// 3. dist/ fallback (old web/)
 
-const distPath = path.join(__dirname, 'dist'); // Old fallback
+const possiblePaths = [
+  path.join(__dirname, 'public'),        // dev: server/server/public
+  path.join(__dirname, '../public'),     // prod: dist-server/../public = server/server/public
+  path.join(__dirname, 'dist'),          // old fallback
+];
 
-const staticPath = fs.existsSync(publicPath) ? publicPath : distPath;
+let staticPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
 
-console.log(`Serving static files from: ${staticPath}`);
+console.log(`[Static] Checking paths: ${possiblePaths.join(', ')}`);
+console.log(`[Static] Serving files from: ${staticPath}`);
 
 app.use(
   express.static(staticPath, {
