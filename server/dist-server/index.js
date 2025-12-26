@@ -327,7 +327,12 @@ const io = new socket_io_1.Server(httpServer, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    // Improve connection stability
+    pingTimeout: 60000, // 60 seconds before considering connection dead
+    pingInterval: 25000, // Send ping every 25 seconds
+    transports: ['websocket', 'polling'], // Prefer WebSocket but fallback to polling
+    allowUpgrades: true,
 });
 const rooms = new Map();
 const socketRoom = new Map();
