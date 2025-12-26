@@ -336,24 +336,24 @@ app.get('/api/room/:roomId', (req, res) => {
 
 // ============== 静态文件服务 ==============
 
-// Serve static files from the React Native Web build
-// Disable caching to avoid clients getting stale JS bundles after redeploy.
-let distPath = path.join(__dirname, 'dist');
-if (!require('fs').existsSync(distPath)) {
-  // Try finding 'web' folder relative to current location
-  // If running from dist-server: ../../web
-  const webPath1 = path.join(__dirname, '../../web');
-  // If running from server root: ../web
-  const webPath2 = path.join(__dirname, '../web');
-  
-  if (require('fs').existsSync(webPath1)) {
-    distPath = webPath1;
-  } else if (require('fs').existsSync(webPath2)) {
-    distPath = webPath2;
-  }
-}
+// Serve static files - prioritize public/ folder (new React client) over legacy paths
+// Priority:
+// 1. public/ at current dir (server/server/public - new React client)
+// 2. ../public (when running from dist-server/)
+// 3. dist/ (legacy)
+// 4. web/ folder
+const fs = require('fs');
+const possiblePaths = [
+  path.join(__dirname, 'public'),        // dev: server/server/public
+  path.join(__dirname, '../public'),     // prod: dist-server/../public = server/server/public
+  path.join(__dirname, 'dist'),          // legacy: dist folder
+  path.join(__dirname, '../../web'),     // fallback: web folder
+  path.join(__dirname, '../web'),
+];
 
-console.log('Serving static files from:', distPath);
+let distPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
+
+console.log('[Static] Serving files from:', distPath);
 
 app.use(
   express.static(distPath, {
@@ -367,7 +367,6 @@ app.use(
 
 // Fallback to index.html for SPA routing (if any)
 // Only send file if it exists, otherwise return 404
-const fs = require('fs');
 const indexPath = path.join(distPath, 'index.html');
 app.use((req, res) => {
   // Skip API routes that weren't matched
