@@ -162,49 +162,59 @@ function generateRoomId(): string {
   return result;
 }
 
-// HTTP 房间存储（与 Socket.IO 房间分开）
-const httpRooms = new Map<string, {
+// HTTP 房间预注册存储（用于 HTTP API 创建房间，然后在 Socket join 时迁移到 rooms）
+const pendingRooms = new Map<string, {
   id: string;
   ownerId: string;
   ownerName: string;
-  playerCount: number;
-  players: { id: string; name: string; ready: boolean }[];
+  maxPlayers: number;
+  clientKey: string;
   createdAt: number;
 }>();
 
-// 创建房间
+// 清理过期的待加入房间（30分钟）
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomId, room] of pendingRooms.entries()) {
+    if (now - room.createdAt > 30 * 60 * 1000) {
+      pendingRooms.delete(roomId);
+      console.log(`[房间] 清理过期预注册房间: ${roomId}`);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// 创建房间（HTTP API 预注册，返回房间号和 clientKey，需要用 Socket join 实际加入）
 app.post('/api/room/create', (req, res) => {
   try {
     const { playerCount = 3, playerName = '玩家' } = req.body || {};
     
     // 生成唯一房间ID
     let roomId = generateRoomId();
-    while (httpRooms.has(roomId)) {
+    while (pendingRooms.has(roomId) || rooms.has(roomId)) {
       roomId = generateRoomId();
     }
     
-    // 生成玩家ID
-    const playerId = `player_${crypto.randomBytes(8).toString('hex')}`;
+    // 生成 clientKey 用于 Socket 认证
+    const clientKey = crypto.randomBytes(16).toString('hex');
     
-    const room = {
+    const pending = {
       id: roomId,
-      ownerId: playerId,
+      ownerId: clientKey,  // 使用 clientKey 作为所有者标识
       ownerName: playerName,
-      playerCount,
-      players: [{ id: playerId, name: playerName, ready: true }],
+      maxPlayers: playerCount,
+      clientKey,
       createdAt: Date.now()
     };
     
-    httpRooms.set(roomId, room);
+    pendingRooms.set(roomId, pending);
     
-    console.log(`[房间] 创建房间: ${roomId} by ${playerName}`);
+    console.log(`[房间] 预注册房间: ${roomId} by ${playerName}`);
     
     res.json({
       roomId,
-      playerId,
+      clientKey,  // 返回给前端，用于 Socket join 时认证身份
       room: {
         id: roomId,
-        players: room.players,
         playerCount,
         isOwner: true
       }
@@ -215,7 +225,7 @@ app.post('/api/room/create', (req, res) => {
   }
 });
 
-// 加入房间
+// 加入房间（检查房间是否存在）
 app.post('/api/room/join', (req, res) => {
   try {
     const { roomId, playerName = '玩家' } = req.body || {};
@@ -224,84 +234,106 @@ app.post('/api/room/join', (req, res) => {
       return res.status(400).json({ error: '请提供房间号' });
     }
     
-    const room = httpRooms.get(roomId.toUpperCase());
-    if (!room) {
-      return res.status(404).json({ error: '房间不存在' });
-    }
+    const upperRoomId = roomId.toUpperCase();
     
-    if (room.players.length >= room.playerCount) {
-      return res.status(400).json({ error: '房间已满' });
-    }
-    
-    const playerId = `player_${crypto.randomBytes(8).toString('hex')}`;
-    room.players.push({ id: playerId, name: playerName, ready: false });
-    
-    console.log(`[房间] ${playerName} 加入房间: ${roomId}`);
-    
-    res.json({
-      roomId: room.id,
-      playerId,
-      room: {
-        id: room.id,
-        players: room.players,
-        playerCount: room.playerCount,
-        isOwner: false
+    // 检查 Socket rooms（已激活的房间）
+    const activeRoom = rooms.get(upperRoomId);
+    if (activeRoom) {
+      if (activeRoom.players.length >= 4) {
+        return res.status(400).json({ error: '房间已满' });
       }
-    });
+      // 生成 clientKey
+      const clientKey = crypto.randomBytes(16).toString('hex');
+      console.log(`[房间] ${playerName} 准备加入活跃房间: ${upperRoomId}`);
+      return res.json({
+        roomId: upperRoomId,
+        clientKey,
+        room: {
+          id: upperRoomId,
+          playerCount: activeRoom.players.length,
+          isOwner: false
+        }
+      });
+    }
+    
+    // 检查预注册房间
+    const pendingRoom = pendingRooms.get(upperRoomId);
+    if (pendingRoom) {
+      const clientKey = crypto.randomBytes(16).toString('hex');
+      console.log(`[房间] ${playerName} 准备加入预注册房间: ${upperRoomId}`);
+      return res.json({
+        roomId: upperRoomId,
+        clientKey,
+        room: {
+          id: upperRoomId,
+          playerCount: pendingRoom.maxPlayers,
+          isOwner: false
+        }
+      });
+    }
+    
+    return res.status(404).json({ error: '房间不存在' });
   } catch (error: any) {
     console.error('[房间] 加入失败:', error);
     res.status(500).json({ error: error.message || '加入房间失败' });
   }
 });
 
-// 快速匹配（简化版：直接创建带机器人的房间）
+// 快速匹配（直接创建带机器人的 Socket 房间）
 app.post('/api/match/quick', (req, res) => {
   try {
     const { playerCount = 3, playerName = '玩家' } = req.body || {};
     
     // 生成房间
     let roomId = generateRoomId();
-    while (httpRooms.has(roomId)) {
+    while (pendingRooms.has(roomId) || rooms.has(roomId)) {
       roomId = generateRoomId();
     }
     
-    const playerId = `player_${crypto.randomBytes(8).toString('hex')}`;
+    const clientKey = crypto.randomBytes(16).toString('hex');
     
-    // 创建带机器人的房间
-    const players: { id: string; name: string; ready: boolean }[] = [
-      { id: playerId, name: playerName, ready: true }
-    ];
+    // 机器人名称（不重复）
+    const allBotNames = ['小明', '小红', '小刚', '小美', '阿强', '小李', '小张', '小王'];
+    const shuffledBotNames = allBotNames.sort(() => Math.random() - 0.5);
     
-    // 添加机器人
-    const botNames = ['小明', '小红', '小刚', '小美', '阿强'];
-    for (let i = 1; i < playerCount; i++) {
+    // 创建玩家列表
+    const players: Room['players'] = [];
+    
+    // 添加机器人（玩家通过 Socket join 加入）
+    for (let i = 0; i < playerCount - 1; i++) {
       players.push({
-        id: `bot_${i}`,
-        name: botNames[Math.floor(Math.random() * botNames.length)] + (i > 1 ? i : ''),
-        ready: true
+        id: `bot_${i}_${Date.now()}`,
+        name: shuffledBotNames[i] || `机器人${i + 1}`,
+        ready: true,
+        score: 10000,
+        connected: true,
+        lastSeen: Date.now(),
+        clientKey: `bot_${i}`,
+        isBot: true,
       });
     }
     
-    const room = {
+    // 预注册房间信息（包含机器人）
+    const pending = {
       id: roomId,
-      ownerId: playerId,
+      ownerId: clientKey,
       ownerName: playerName,
-      playerCount,
-      players,
-      createdAt: Date.now()
+      maxPlayers: playerCount,
+      clientKey,
+      createdAt: Date.now(),
+      bots: players  // 存储机器人信息
     };
     
-    httpRooms.set(roomId, room);
+    (pendingRooms as any).set(roomId, pending);
     
-    console.log(`[匹配] 快速匹配成功: ${roomId} for ${playerName}`);
+    console.log(`[匹配] 快速匹配预注册: ${roomId} for ${playerName}, 机器人: ${playerCount - 1}`);
     
     res.json({
       roomId,
-      playerId,
+      clientKey,
       matched: true,
       room: {
         id: roomId,
-        players: room.players,
         playerCount
       }
     });
@@ -315,18 +347,35 @@ app.post('/api/match/quick', (req, res) => {
 app.get('/api/room/:roomId', (req, res) => {
   try {
     const { roomId } = req.params;
-    const room = httpRooms.get(roomId.toUpperCase());
+    const upperRoomId = roomId.toUpperCase();
     
-    if (!room) {
+    // 优先检查活跃房间
+    const activeRoom = rooms.get(upperRoomId);
+    if (activeRoom) {
+      return res.json({
+        room: {
+          id: activeRoom.id,
+          players: activeRoom.players.map(p => ({ id: p.id, name: p.name, ready: p.ready, isBot: p.isBot })),
+          playerCount: activeRoom.players.length,
+          ownerId: activeRoom.owner
+        }
+      });
+    }
+    
+    // 检查预注册房间
+    const pendingRoom = pendingRooms.get(upperRoomId);
+    
+    if (!pendingRoom) {
       return res.status(404).json({ error: '房间不存在' });
     }
     
     res.json({
       room: {
-        id: room.id,
-        players: room.players,
-        playerCount: room.playerCount,
-        ownerId: room.ownerId
+        id: pendingRoom.id,
+        players: [],
+        playerCount: pendingRoom.maxPlayers,
+        ownerId: pendingRoom.ownerId,
+        status: 'waiting'
       }
     });
   } catch (error: any) {
@@ -666,29 +715,38 @@ io.on('connection', (socket: Socket) => {
     socket.emit('roomList', roomList);
   });
 
-  socket.on('chatMessage', ({ room, message }: { room: string; message: string }) => {
-    if (isRateLimited(socket.id, 500)) return;
-    const r = rooms.get(room);
-    if (!r) return;
-    
-    const player = r.players.find(p => p.id === socket.id);
-    if (!player) return;
-
-    // Broadcast to room
-    io.to(room).emit('chatMessage', {
-      sender: player.name,
-      message: message.substring(0, 100), // Limit length
-      timestamp: Date.now()
-    });
-  });
+  // chatMessage 事件统一在文件末尾处理（避免重复）
 
   socket.on('join', ({ room, name, clientKey, lastSfxSeq, lastMvpSeq }: { room: string; name: string; clientKey?: string; lastSfxSeq?: number; lastMvpSeq?: number }) => {
     if (isRateLimited(socket.id, 200)) return;
-    socket.join(room);
-    let r = rooms.get(room);
+    const upperRoom = room.toUpperCase();
+    socket.join(upperRoom);
+    let r = rooms.get(upperRoom);
+    
+    // 检查是否有预注册房间需要迁移
+    const pending = pendingRooms.get(upperRoom) as any;
+    
     if (!r) {
-      r = { id: room, players: [], gameState: null, owner: socket.id, eventSeq: 0, recentSfxEvents: [], mvpSeq: 0, recentMvpEvents: [], matchHistory: [] };
-      rooms.set(room, r);
+      // 创建新房间
+      r = { 
+        id: upperRoom, 
+        players: [], 
+        gameState: null, 
+        owner: socket.id,  // 临时设为当前连接者，后面会根据 clientKey 判断
+        eventSeq: 0, 
+        recentSfxEvents: [], 
+        mvpSeq: 0, 
+        recentMvpEvents: [], 
+        matchHistory: [] 
+      };
+      
+      // 如果有预注册房间，迁移机器人玩家
+      if (pending && pending.bots) {
+        r.players.push(...pending.bots);
+        console.log(`[房间] 迁移预注册房间 ${upperRoom}，包含 ${pending.bots.length} 个机器人`);
+      }
+      
+      rooms.set(upperRoom, r);
     }
 
     const now = Date.now();
@@ -696,9 +754,18 @@ io.on('connection', (socket: Socket) => {
     // Resolve or assign persistent identity
     const resolvedClientKey = (clientKey && String(clientKey).trim()) ? String(clientKey).trim() : newClientKey();
     
+    // 检查是否是预注册房间的房主
+    const isOwnerByPending = pending && pending.clientKey === resolvedClientKey;
+    if (isOwnerByPending) {
+      r.owner = socket.id;
+      console.log(`[房间] ${name} 是预注册房间 ${upperRoom} 的房主`);
+      // 清理预注册房间
+      pendingRooms.delete(upperRoom);
+    }
+    
     // Prefer matching by persistent clientKey.
     const existingByKey = r.players.find(p => p.clientKey === resolvedClientKey);
-    const existingByName = r.players.find(p => p.name === name);
+    const existingByName = r.players.find(p => p.name === name && !p.isBot);
 
     // Enforce unique names unless it's the same identity.
     if (!existingByKey && existingByName && (existingByName as any).clientKey && (existingByName as any).clientKey !== resolvedClientKey) {
@@ -714,7 +781,9 @@ io.on('connection', (socket: Socket) => {
 
     const existing = existingByKey || existingByName;
     if (!existing) {
-      if (r.players.length >= 4) {
+      // 检查非机器人玩家数量
+      const humanCount = r.players.filter(p => !p.isBot).length;
+      if (humanCount >= 4) {
         socket.emit('error', 'Room full');
         return;
       }
@@ -728,6 +797,11 @@ io.on('connection', (socket: Socket) => {
         lastSeen: now,
         clientKey: resolvedClientKey,
       });
+      
+      // 如果是第一个真人玩家且没有从预注册迁移，设为房主
+      if (humanCount === 0 && !isOwnerByPending) {
+        r.owner = socket.id;
+      }
     } else {
       // update socket id
       const oldId = existing.id;
@@ -872,9 +946,102 @@ io.on('connection', (socket: Socket) => {
     socket.emit('hints', { hintKey, options });
   });
 
-  socket.on('action', ({ room, action }: { room: string; action: Action }) => {
+  // ============== 兼容旧前端的 play/pass 事件 ==============
+  
+  // 前端可能发送 'play' 事件而非 'action'
+  socket.on('play', ({ room, cards, cardIndices }: { room: string; cards?: Card[]; cardIndices?: number[] }) => {
     if (isRateLimited(socket.id, 80)) return;
-    const r = rooms.get(room);
+    const upperRoom = room?.toUpperCase?.() || room;
+    const r = rooms.get(upperRoom);
+    if (!r || !r.gameState) {
+      socket.emit('error', '房间不存在或游戏未开始');
+      return;
+    }
+
+    const pIdx = r.players.findIndex(p => p.id === socket.id);
+    if (pIdx === -1) {
+      socket.emit('error', '你不在这个房间');
+      return;
+    }
+
+    if (r.gameState.currentPlayer !== pIdx) {
+      socket.emit('error', '不是你的回合');
+      return;
+    }
+
+    // 如果传的是 cardIndices，需要转换为 cards
+    let playCards: Card[] = cards || [];
+    if (cardIndices && cardIndices.length > 0 && r.gameState.hands[pIdx]) {
+      const hand = r.gameState.hands[pIdx];
+      playCards = cardIndices.map(i => hand[i]).filter(Boolean);
+    }
+
+    if (playCards.length === 0) {
+      socket.emit('error', '请选择要出的牌');
+      return;
+    }
+
+    // 触发 action 事件处理（通过内部调用）
+    socket.emit('_internalAction', { room: upperRoom, action: { type: 'play', cards: playCards } });
+  });
+
+  // 前端可能发送 'pass' 事件而非 'action'
+  socket.on('pass', ({ room }: { room: string }) => {
+    if (isRateLimited(socket.id, 80)) return;
+    const upperRoom = room?.toUpperCase?.() || room;
+    const r = rooms.get(upperRoom);
+    if (!r || !r.gameState) {
+      socket.emit('error', '房间不存在或游戏未开始');
+      return;
+    }
+
+    const pIdx = r.players.findIndex(p => p.id === socket.id);
+    if (pIdx === -1) {
+      socket.emit('error', '你不在这个房间');
+      return;
+    }
+
+    if (r.gameState.currentPlayer !== pIdx) {
+      socket.emit('error', '不是你的回合');
+      return;
+    }
+
+    // 触发 action 事件处理
+    socket.emit('_internalAction', { room: upperRoom, action: { type: 'pass' } });
+  });
+
+  // 离开房间
+  socket.on('leave', ({ room }: { room: string }) => {
+    const upperRoom = room?.toUpperCase?.() || room;
+    const r = rooms.get(upperRoom);
+    if (!r) return;
+
+    const pIdx = r.players.findIndex(p => p.id === socket.id);
+    if (pIdx === -1) return;
+
+    // 标记为断开连接
+    r.players[pIdx].connected = false;
+    socket.leave(upperRoom);
+    socketRoom.delete(socket.id);
+    socketClientKey.delete(socket.id);
+
+    console.log(`[房间] 玩家 ${r.players[pIdx].name} 主动离开房间 ${upperRoom}`);
+
+    emitRoomState(r);
+
+    // 如果游戏未开始且所有人都离开了，清理房间
+    const allDisconnected = r.players.every(p => !p.connected || p.isBot);
+    if (allDisconnected && !r.gameState) {
+      if (r.turnTimer) clearTimeout(r.turnTimer);
+      rooms.delete(upperRoom);
+      console.log(`[房间] ${upperRoom} 已清理（所有玩家离开）`);
+    }
+  });
+
+  // 处理 action 事件（支持内部调用和外部调用）
+  const handleActionEvent = ({ room, action }: { room: string; action: Action }) => {
+    const upperRoom = room?.toUpperCase?.() || room;
+    const r = rooms.get(upperRoom);
     if (!r || !r.gameState) return;
 
     try {
@@ -929,8 +1096,6 @@ io.on('connection', (socket: Socket) => {
       
       // Check if someone just finished
       if (nextState.finishedOrder.length > prevFinishedCount) {
-          // The player who actively finished is at the index of the previous count
-          // (e.g. if 0 people finished, the new one is at index 0)
           const newFinishedIdx = nextState.finishedOrder[prevFinishedCount];
             const finishedPlayer = r.players[newFinishedIdx];
             if (finishedPlayer && finishedPlayer.mvpSound) {
@@ -952,13 +1117,11 @@ io.on('connection', (socket: Socket) => {
          const finished = nextState.finishedOrder;
          
          if (r.players.length === 3) {
-             // 3 Players: 1st gets from 3rd
              const winnerIdx = finished[0];
              const loserIdx = finished[2];
              r.players[winnerIdx].score += totalStake;
              r.players[loserIdx].score -= totalStake;
          } else if (r.players.length === 4) {
-             // 4 Players: 1st gets from 4th, 2nd gets half from 3rd
              const p1 = finished[0];
              const p2 = finished[1];
              const p3 = finished[2];
@@ -970,32 +1133,27 @@ io.on('connection', (socket: Socket) => {
              r.players[p2].score += totalStake / 2;
              r.players[p3].score -= totalStake / 2;
          }
-// Record History
+         
          r.matchHistory.push({
              timestamp: Date.now(),
              scores: r.players.map(p => ({ name: p.name, score: p.score })),
              winner: r.players[finished[0]].name
          });
-         // Keep last 10
          if (r.matchHistory.length > 10) r.matchHistory.shift();
 
-         
          r.lastRoundResult = {
              finishedOrder: nextState.finishedOrder,
              revolution: nextState.revolution
          };
          
-         io.to(room).emit('gameOver', { 
+         io.to(upperRoom).emit('gameOver', { 
              finishedOrder: nextState.finishedOrder,
              scores: r.players.map(p => ({ id: p.id, score: p.score })),
              multiplier: multiplier
          });
          
-        // Broadcast updated room info to show new scores immediately
-        emitRoomState(r);
-
+         emitRoomState(r);
       } else {
-         // Start timer for next player
          startTurnTimer(r);
       }
 
@@ -1003,7 +1161,14 @@ io.on('connection', (socket: Socket) => {
       console.error(`Action error for room ${room}:`, e);
       socket.emit('error', e.message);
     }
+  };
+
+  socket.on('action', ({ room, action }: { room: string; action: Action }) => {
+    if (isRateLimited(socket.id, 80)) return;
+    handleActionEvent({ room, action });
   });
+
+  socket.on('_internalAction', handleActionEvent);
 
   socket.on('debug_win', ({ room }) => {
     if (isRateLimited(socket.id, 200)) return;

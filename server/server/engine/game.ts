@@ -688,6 +688,12 @@ export function hasValidMove(hand: Card[], lastPlay: Pattern | null): boolean {
       return hand.some(c => c.sortValue > lastPlay.strength);
   }
   if (lastPlay.type === 'PAIR') {
+      // 炸(TRIPLE)可以压对子
+      for (const [rank, count] of counts.entries()) {
+          if (count >= 3) {
+              return true; // 任何炸都能压对子
+          }
+      }
       // Check if any pair > strength
       for (const [rank, count] of counts.entries()) {
           if (count >= 2) {

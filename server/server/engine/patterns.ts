@@ -172,5 +172,13 @@ export function canBeat(previous: Pattern, next: Pattern): boolean {
     if (next.type === 'PAIR' && next.extra?.isKingBomb) return true;
     return false;
   }
+  if (previous.type === 'DOUBLE_SEQUENCE') {
+    // 连对只能被同长度更大的连对、炸、轰、王炸压制
+    if (next.type === 'DOUBLE_SEQUENCE' && (next.extra?.straightLength === previous.extra?.straightLength)) {
+      return next.strength > previous.strength;
+    }
+    if (next.type === 'TRIPLE' || next.type === 'FOUR' || (next.type === 'PAIR' && next.extra?.isKingBomb)) return true;
+    return false;
+  }
   return false;
 }

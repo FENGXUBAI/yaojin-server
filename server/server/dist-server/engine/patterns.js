@@ -136,7 +136,7 @@ function detectPattern(cards) {
     return null;
 }
 function canBeat(previous, next) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     // 逻辑五~九
     if (previous.type === 'SINGLE') {
         if (next.type === 'SINGLE')
@@ -177,6 +177,15 @@ function canBeat(previous, next) {
         if (next.type === 'FOUR')
             return next.strength > previous.strength;
         if (next.type === 'PAIR' && ((_h = next.extra) === null || _h === void 0 ? void 0 : _h.isKingBomb))
+            return true;
+        return false;
+    }
+    if (previous.type === 'DOUBLE_SEQUENCE') {
+        // 连对只能被同长度更大的连对、炸、轰、王炸压制
+        if (next.type === 'DOUBLE_SEQUENCE' && (((_j = next.extra) === null || _j === void 0 ? void 0 : _j.straightLength) === ((_k = previous.extra) === null || _k === void 0 ? void 0 : _k.straightLength))) {
+            return next.strength > previous.strength;
+        }
+        if (next.type === 'TRIPLE' || next.type === 'FOUR' || (next.type === 'PAIR' && ((_l = next.extra) === null || _l === void 0 ? void 0 : _l.isKingBomb)))
             return true;
         return false;
     }

@@ -1,10 +1,17 @@
 /**
  * 网络联机模块
- * 使用 Socket.io 连接 Koyeb 服务器
+ * 使用 Socket.io 连接服务器
  */
 const Network = {
-  // Koyeb 服务器地址
-  SERVER_URL: 'https://wise-galliform-zanli-2885a498.koyeb.app',
+  // 服务器地址（自动检测：本地开发使用 localhost，线上使用相对路径）
+  SERVER_URL: (() => {
+    // 如果是本地开发环境
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:3000';
+    }
+    // 线上环境使用当前域名
+    return window.location.origin;
+  })(),
   
   // Socket 连接
   socket: null,
