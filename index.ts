@@ -336,11 +336,23 @@ app.get('/api/room/:roomId', (req, res) => {
 
 // ============== 静态文件服务 ==============
 
-// Serve static files from the React Native Web build
-// Disable caching to avoid clients getting stale JS bundles after redeploy.
-const distPath = path.join(__dirname, 'dist');
+const fs = require('fs');
+
+// Try to serve from 'public' (New React Client) first
+// In dev: __dirname is root. public is root/public
+// In prod: __dirname is dist-server. public is root/public (../public)
+const publicPath = process.env.NODE_ENV === 'production' 
+  ? path.join(__dirname, '../public') 
+  : path.join(__dirname, 'public');
+
+const distPath = path.join(__dirname, 'dist'); // Old fallback
+
+const staticPath = fs.existsSync(publicPath) ? publicPath : distPath;
+
+console.log(`Serving static files from: ${staticPath}`);
+
 app.use(
-  express.static(distPath, {
+  express.static(staticPath, {
     etag: false,
     lastModified: false,
     setHeaders: (res) => {
@@ -351,8 +363,7 @@ app.use(
 
 // Fallback to index.html for SPA routing (if any)
 // Only send file if it exists, otherwise return 404
-const fs = require('fs');
-const indexPath = path.join(distPath, 'index.html');
+const indexPath = path.join(staticPath, 'index.html');
 app.use((req, res) => {
   // Skip API routes that weren't matched
   if (req.path.startsWith('/api/')) {

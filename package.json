@@ -4,7 +4,7 @@
   "description": "要进游戏服务器",
   "main": "dist-server/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/deploy_client.js",
     "start": "node dist-server/index.js",
     "dev": "npx ts-node index.ts"
   },
