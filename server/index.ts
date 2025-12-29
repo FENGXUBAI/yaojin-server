@@ -336,26 +336,6 @@ app.get('/api/room/:roomId', (req, res) => {
 
 // ============== 静态文件服务 ==============
 
-<<<<<<< HEAD
-// Serve static files - prioritize public/ folder (new React client) over legacy paths
-// Priority:
-// 1. public/ at current dir (server/server/public - new React client)
-// 2. ../public (when running from dist-server/)
-// 3. dist/ (legacy)
-// 4. web/ folder
-const fs = require('fs');
-const possiblePaths = [
-  path.join(__dirname, 'public'),        // dev: server/server/public
-  path.join(__dirname, '../public'),     // prod: dist-server/../public = server/server/public
-  path.join(__dirname, 'dist'),          // legacy: dist folder
-  path.join(__dirname, '../../web'),     // fallback: web folder
-  path.join(__dirname, '../web'),
-];
-
-let distPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
-
-console.log('[Static] Serving files from:', distPath);
-=======
 const fs = require('fs');
 
 // Priority order for static files:
@@ -364,16 +344,15 @@ const fs = require('fs');
 // 3. dist/ fallback (old web/)
 
 const possiblePaths = [
-  path.join(__dirname, 'public'),        // dev: yaojin/public
-  path.join(__dirname, '../public'),     // prod: dist-server/../public = yaojin/public
-  path.join(__dirname, 'dist'),          // old fallback: yaojin/dist or dist-server/dist
+  path.join(__dirname, 'public'),        // dev: yaojin/server/public
+  path.join(__dirname, '../public'),     // prod: dist-server/../public = yaojin/server/public
+  path.join(__dirname, 'dist'),          // old fallback: yaojin/server/dist or dist-server/dist
 ];
 
-let staticPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
+const staticPath = possiblePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possiblePaths[0];
 
 console.log(`[Static] Checking paths: ${possiblePaths.join(', ')}`);
 console.log(`[Static] Serving files from: ${staticPath}`);
->>>>>>> 0fc789e (fix: prevent socket reconnect from killing room)
 
 app.use(
   express.static(staticPath, {
@@ -409,7 +388,7 @@ const io = new Server(httpServer, {
   // Improve connection stability (especially behind reverse proxies)
   pingTimeout: 60000,
   pingInterval: 25000,
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
   allowUpgrades: true,
 });
 

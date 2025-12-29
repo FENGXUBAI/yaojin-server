@@ -290,11 +290,11 @@ const fs = require('fs');
 // 2. ../public (when running from dist-server/)
 // 3. dist/ fallback (old web/)
 const possiblePaths = [
-    path_1.default.join(__dirname, 'public'), // dev: yaojin/public
-    path_1.default.join(__dirname, '../public'), // prod: dist-server/../public = yaojin/public
-    path_1.default.join(__dirname, 'dist'), // old fallback: yaojin/dist or dist-server/dist
+    path_1.default.join(__dirname, 'public'), // dev: yaojin/server/public
+    path_1.default.join(__dirname, '../public'), // prod: dist-server/../public = yaojin/server/public
+    path_1.default.join(__dirname, 'dist'), // old fallback: yaojin/server/dist or dist-server/dist
 ];
-let staticPath = possiblePaths.find(p => fs.existsSync(path_1.default.join(p, 'index.html'))) || possiblePaths[0];
+const staticPath = possiblePaths.find(p => fs.existsSync(path_1.default.join(p, 'index.html'))) || possiblePaths[0];
 console.log(`[Static] Checking paths: ${possiblePaths.join(', ')}`);
 console.log(`[Static] Serving files from: ${staticPath}`);
 app.use(express_1.default.static(staticPath, {
@@ -328,7 +328,7 @@ const io = new socket_io_1.Server(httpServer, {
     // Improve connection stability (especially behind reverse proxies)
     pingTimeout: 60000,
     pingInterval: 25000,
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     allowUpgrades: true,
 });
 const rooms = new Map();

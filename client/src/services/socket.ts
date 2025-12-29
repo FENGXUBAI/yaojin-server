@@ -25,7 +25,7 @@ class GameSocket {
     }
 
     this.socket = io(url, {
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
