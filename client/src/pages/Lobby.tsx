@@ -11,6 +11,7 @@ export default function Lobby() {
   const logout = useUserStore(state => state.logout)
   const { createRoom, joinRoom, quickMatch } = useGameStore()
   const [roomIdInput, setRoomIdInput] = useState('')
+  const [playerCount, setPlayerCount] = useState<3 | 4>(3)
 
   useEffect(() => {
     if (!user) {
@@ -20,7 +21,7 @@ export default function Lobby() {
 
   const handleCreateRoom = async () => {
     try {
-      const roomId = await createRoom(3) // Default 3 players
+      const roomId = await createRoom(playerCount)
       navigate(`/room/${roomId}`)
     } catch (error: any) {
       toast.error(error.message || '创建失败')
@@ -39,7 +40,7 @@ export default function Lobby() {
 
   const handleQuickMatch = async () => {
     try {
-      const roomId = await quickMatch()
+      const roomId = await quickMatch(playerCount)
       navigate(`/room/${roomId}`)
     } catch (error: any) {
       toast.error(error.message || '匹配失败')
@@ -76,6 +77,23 @@ export default function Lobby() {
       <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Actions */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Player Count */}
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-sm text-slate-400">人数</span>
+            <button
+              onClick={() => setPlayerCount(3)}
+              className={`px-3 py-1 rounded-full text-sm border transition-colors ${playerCount === 3 ? 'bg-primary-600 text-white border-primary-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-600'}`}
+            >
+              3人
+            </button>
+            <button
+              onClick={() => setPlayerCount(4)}
+              className={`px-3 py-1 rounded-full text-sm border transition-colors ${playerCount === 4 ? 'bg-primary-600 text-white border-primary-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-600'}`}
+            >
+              4人
+            </button>
+          </div>
+
           {/* Quick Start Banner */}
           <div 
             onClick={handleQuickMatch}

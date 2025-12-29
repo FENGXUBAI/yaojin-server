@@ -459,6 +459,7 @@ function executeBotTurn(room) {
             if (winner && winner.mvpSound) {
                 emitMvp(room, { sound: winner.mvpSound, name: winner.name, durationMs: 15000 });
             }
+            room.gameState = null;
             emitRoomState(room);
         }
         else {
@@ -545,6 +546,7 @@ function emitRoomState(r) {
     }));
     io.to(r.id).emit('roomState', {
         players: publicPlayers,
+        playerCount: r.maxPlayers,
         gameState: publicGameState,
         owner: r.owner,
         debugEnabled: DEBUG_ENABLED,
@@ -553,6 +555,7 @@ function emitRoomState(r) {
     // Back-compat: keep emitting roomUpdate but with sanitized gameState
     io.to(r.id).emit('roomUpdate', {
         players: publicPlayers,
+        playerCount: r.maxPlayers,
         gameState: publicGameState,
         owner: r.owner,
     });
@@ -616,7 +619,11 @@ io.on('connection', (socket) => {
         socket.join(room);
         let r = rooms.get(room);
         if (!r) {
-            r = { id: room, players: [], gameState: null, owner: socket.id, eventSeq: 0, recentSfxEvents: [], mvpSeq: 0, recentMvpEvents: [], matchHistory: [] };
+            const upper = String(room || '').toUpperCase();
+            const httpRoom = httpRooms.get(upper);
+            const desired = httpRoom?.playerCount;
+            const maxPlayers = desired === 3 || desired === 4 ? desired : 4;
+            r = { id: room, players: [], maxPlayers, gameState: null, owner: socket.id, eventSeq: 0, recentSfxEvents: [], mvpSeq: 0, recentMvpEvents: [], matchHistory: [] };
             rooms.set(room, r);
         }
         const now = Date.now();
@@ -637,7 +644,7 @@ io.on('connection', (socket) => {
         }
         const existing = existingByKey || existingByName;
         if (!existing) {
-            if (r.players.length >= 4) {
+            if (r.players.length >= r.maxPlayers) {
                 socket.emit('error', 'Room full');
                 return;
             }
@@ -713,6 +720,10 @@ io.on('connection', (socket) => {
         }
         if (r.players.length < 2) {
             socket.emit('error', '需要至少2人才能开始');
+            return;
+        }
+        if (r.players.length !== r.maxPlayers) {
+            socket.emit('error', `房间未满（${r.players.length}/${r.maxPlayers}）`);
             return;
         }
         try {
@@ -899,6 +910,8 @@ io.on('connection', (socket) => {
                     scores: r.players.map(p => ({ id: p.id, score: p.score })),
                     multiplier: multiplier
                 });
+                // Reset to waiting so the next round can be started
+                r.gameState = null;
                 // Broadcast updated room info to show new scores immediately
                 emitRoomState(r);
             }
@@ -972,6 +985,7 @@ io.on('connection', (socket) => {
                     scores: r.players.map(p => ({ id: p.id, score: p.score })),
                     multiplier: multiplier
                 });
+                r.gameState = null;
                 emitRoomState(r);
             }
             else {
@@ -1021,10 +1035,28 @@ io.on('connection', (socket) => {
             return;
         // 广播聊天消息给房间内所有玩家
         io.to(room).emit('chatMessage', {
-            player: player.name,
-            message: message,
-            isEmoji: isEmoji || false
+            sender: player.name,
+            message: message.substring(0, 100),
+            isEmoji: !!isEmoji,
+            timestamp: Date.now()
         });
+    });
+    // 用户主动开关托管
+    socket.on('setTrusteeship', ({ room, enabled }) => {
+        if (isRateLimited(socket.id, 200))
+            return;
+        const r = rooms.get(room);
+        if (!r)
+            return;
+        const p = r.players.find(pl => pl.id === socket.id);
+        if (!p)
+            return;
+        p.isTrusteeship = !!enabled;
+        emitRoomState(r);
+        // If we just enabled trusteeship and it's this player's turn, execute immediately
+        if (enabled && r.gameState && r.gameState.currentPlayer === r.players.indexOf(p)) {
+            executeBotTurn(r);
+        }
     });
 });
 const PORT = Number(process.env.PORT) || 3000;

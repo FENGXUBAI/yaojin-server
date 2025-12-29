@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { gameSocket } from '@/services/socket'
-import { Room, GameState, RoomStatePayload, Card } from '@/types'
+import { Room, GameState, RoomStatePayload, Card, ChatMessage } from '@/types'
 import { useUserStore } from './userStore'
 import toast from 'react-hot-toast'
+import { playSfx } from '@/services/sfx'
 
 let listenersBound = false
 
@@ -11,18 +12,21 @@ interface GameStore {
   gameState: GameState | null
   isConnected: boolean
   clientKey: string | null
+  chatMessages: ChatMessage[]
   
   // Actions
   connect: () => void
   disconnect: () => void
   createRoom: (playerCount: number) => Promise<string>
   joinRoom: (roomId: string) => Promise<void>
-  quickMatch: () => Promise<string>
+  quickMatch: (playerCount?: number) => Promise<string>
   leaveRoom: () => void
   startGame: () => void
   
   playCards: (cards: Card[]) => void
   pass: () => void
+  sendChat: (message: string, isEmoji?: boolean) => void
+  setTrusteeship: (enabled: boolean) => void
   
   // Event Handlers (internal use mostly)
   handleRoomState: (data: RoomStatePayload) => void
@@ -34,6 +38,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameState: null,
   isConnected: false,
   clientKey: null,
+  chatMessages: [],
 
   connect: () => {
     gameSocket.connect()
@@ -81,6 +86,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         toast.success('游戏结束!', { icon: '🏁' })
         // 可以弹窗显示结算
       })
+
+      gameSocket.on('sfxEvent', (evt: any) => {
+        playSfx(evt)
+      })
+
+      gameSocket.on('chatMessage', (msg: ChatMessage) => {
+        set(state => ({
+          chatMessages: [...state.chatMessages.slice(-29), msg]
+        }))
+      })
     }
   },
 
@@ -108,6 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
+    const serverPlayerCount = data.room?.playerCount ?? data.playerCount ?? playerCount
     
     // Pre-set room info so handleRoomState can use it
     set({ 
@@ -115,7 +131,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       room: {
         id: data.roomId,
         players: [],
-        playerCount: playerCount,
+        playerCount: serverPlayerCount,
         ownerId: '',
         status: 'waiting',
         gameState: null
@@ -152,6 +168,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
+    const serverPlayerCount = data.room?.playerCount ?? data.playerCount ?? 3
     
     // Pre-set room info
     set({ 
@@ -159,7 +176,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       room: {
         id: roomId,
         players: [],
-        playerCount: 3, // Will be updated by roomState
+        playerCount: serverPlayerCount,
         ownerId: '',
         status: 'waiting',
         gameState: null
@@ -174,7 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
   },
 
-  quickMatch: async () => {
+  quickMatch: async (playerCount: number = 3) => {
     // Ensure socket exists early; emits will be buffered until connected.
     get().connect()
 
@@ -184,7 +201,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const res = await fetch('/api/match/quick', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerCount: 3, playerName: user.nickname }),
+      body: JSON.stringify({ playerCount, playerName: user.nickname }),
     })
 
     if (!res.ok) {
@@ -193,6 +210,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const data = await res.json()
+    const serverPlayerCount = data.room?.playerCount ?? data.playerCount ?? playerCount
     
     // Pre-set room info
     set({ 
@@ -200,7 +218,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       room: {
         id: data.roomId,
         players: [],
-        playerCount: 3,
+        playerCount: serverPlayerCount,
         ownerId: '',
         status: 'waiting',
         gameState: null
@@ -221,7 +239,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (room) {
       gameSocket.emit('leave', { room: room.id })
     }
-    set({ room: null, gameState: null })
+    set({ room: null, gameState: null, chatMessages: [] })
   },
 
   startGame: () => {
@@ -252,10 +270,37 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  sendChat: (message: string, isEmoji: boolean = false) => {
+    const { room } = get()
+    if (room) {
+      gameSocket.emit('chatMessage', { room: room.id, message, isEmoji })
+    }
+  },
+
+  setTrusteeship: (enabled: boolean) => {
+    const { room } = get()
+    if (room) {
+      gameSocket.emit('setTrusteeship', { room: room.id, enabled })
+    }
+  },
+
   handleRoomState: (data: RoomStatePayload) => {
     const currentRoom = get().room
     const roomId = currentRoom?.id || 'UNKNOWN'
-    const playerCount = currentRoom?.playerCount ?? data.players?.length ?? 3
+    const playerCount = data.playerCount ?? data.gameState?.playerCount ?? currentRoom?.playerCount ?? data.players?.length ?? 3
+    const prevHands = get().gameState?.hands
+    const incomingGameState = data.gameState as any
+    const normalizedGameState: GameState | null = incomingGameState
+      ? {
+          ...incomingGameState,
+          hands:
+            Array.isArray(incomingGameState.hands) && incomingGameState.hands.length > 0
+              ? incomingGameState.hands
+              : (prevHands && prevHands.length > 0
+                  ? prevHands
+                  : new Array(incomingGameState.playerCount ?? playerCount).fill([])),
+        }
+      : null
     
     console.log('[GameStore] handleRoomState:', { roomId, playerCount, players: data.players?.length })
     
@@ -265,10 +310,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         playerCount: playerCount,
         players: data.players || [],
         ownerId: data.owner || '',
-        status: data.gameState ? 'playing' : 'waiting',
-        gameState: data.gameState || null
+        status: normalizedGameState ? 'playing' : 'waiting',
+        gameState: normalizedGameState
       },
-      gameState: data.gameState || null
+      gameState: normalizedGameState
     })
   },
 

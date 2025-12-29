@@ -6,6 +6,7 @@ const rootDir = path.resolve(__dirname, '..');
 const clientDir = path.join(rootDir, 'client');
 const publicDir1 = path.join(rootDir, 'public');
 const publicDir2 = path.join(rootDir, 'server/server/public');
+const legacySoundsDir = path.join(rootDir, 'web', 'assets', 'sounds');
 
 if (!fs.existsSync(clientDir)) {
   console.log('Client directory not found, skipping build.');
@@ -58,6 +59,20 @@ if (fs.existsSync(distDir)) {
         fs.mkdirSync(path.dirname(publicDir2), { recursive: true });
     }
     copyDir(distDir, publicDir2);
+
+    // Copy legacy sound assets so the new React client can reuse them.
+    try {
+      if (fs.existsSync(legacySoundsDir)) {
+        const soundsTarget1 = path.join(publicDir1, 'assets', 'sounds');
+        const soundsTarget2 = path.join(publicDir2, 'assets', 'sounds');
+        console.log(`Copying sounds to ${soundsTarget1}...`);
+        copyDir(legacySoundsDir, soundsTarget1);
+        console.log(`Copying sounds to ${soundsTarget2}...`);
+        copyDir(legacySoundsDir, soundsTarget2);
+      }
+    } catch (e) {
+      console.warn('Copying legacy sounds failed:', e);
+    }
     
     console.log('Client deployment complete.');
 } else {

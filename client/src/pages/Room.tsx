@@ -5,11 +5,13 @@ import { useUserStore } from '@/store/userStore'
 import { gameSocket } from '@/services/socket'
 import toast from 'react-hot-toast'
 import Card from '@/components/Card'
+import ChatPanel from '@/components/ChatPanel'
+import { Bot } from 'lucide-react'
 
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
-  const { room, gameState, joinRoom, leaveRoom, isConnected, playCards, pass, startGame } = useGameStore()
+  const { room, gameState, joinRoom, leaveRoom, isConnected, playCards, pass, startGame, setTrusteeship } = useGameStore()
   const user = useUserStore(state => state.user)
   const [selectedCards, setSelectedCards] = useState<number[]>([]) // Indices of selected cards
 
@@ -43,7 +45,9 @@ export default function Room() {
   const getPlayerAtOffset = (offset: number) => {
     if (!room || myIndex === -1) return null
     const idx = (myIndex + offset) % room.playerCount
-    return { player: room.players[idx], index: idx }
+    const player = room.players[idx]
+    if (!player) return null
+    return { player, index: idx }
   }
 
   // Toggle card selection
@@ -55,7 +59,11 @@ export default function Room() {
 
   const handlePlay = () => {
     if (!gameState || myIndex === -1) return
-    const hand = gameState.hands[myIndex]
+    const hand = gameState.hands?.[myIndex] ?? []
+    if (hand.length === 0) {
+      toast.error('手牌尚未同步，请稍候')
+      return
+    }
     const cardsToPlay = selectedCards.map(i => hand[i]).filter(Boolean)
     if (cardsToPlay.length === 0) {
       toast.error('请选择要出的牌')
@@ -80,8 +88,16 @@ export default function Room() {
 
   const isOwner = room.ownerId === gameSocket.id
   const isPlaying = room.status === 'playing' && gameState
-  const myHand = isPlaying && myIndex !== -1 ? gameState.hands[myIndex] : []
+  const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
+
+  // Check trusteeship status of current player
+  const myPlayer = myIndex !== -1 ? room.players[myIndex] : null
+  const isTrusteeship = !!myPlayer?.isTrusteeship
+
+  const toggleTrusteeship = () => {
+    setTrusteeship(!isTrusteeship)
+  }
 
   // Layout for 3 players: My(Bottom), Right(Next), Left(Prev)
   // Layout for 4 players: My(Bottom), Right, Top, Left
@@ -103,6 +119,14 @@ export default function Room() {
           </span>
         </div>
         <div className="flex items-center gap-4">
+          {isPlaying && (
+            <button
+              onClick={toggleTrusteeship}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium transition-colors ${isTrusteeship ? 'bg-yellow-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+            >
+              <Bot size={16} /> {isTrusteeship ? '托管中' : '托管'}
+            </button>
+          )}
           {!isPlaying && isOwner && (
             <button 
               onClick={startGame}
@@ -158,12 +182,14 @@ export default function Room() {
         {/* Top Player (if 4 players) */}
         {topPlayer && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center mb-2 shadow-lg">
+            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${topPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {topPlayer.player.name[0]}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
               {topPlayer.player.name}
+              {topPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
+            <div className="text-xs text-yellow-400 mt-0.5">🪙 {topPlayer.player.score}</div>
             <div className="mt-2 flex -space-x-1">
               {/* Card Backs */}
               {Array.from({ length: 5 }).map((_, i) => ( // Mock count
@@ -176,12 +202,14 @@ export default function Room() {
         {/* Left Player */}
         {leftPlayer && (
           <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center mb-2 shadow-lg">
+            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${leftPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {leftPlayer.player.name[0]}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
               {leftPlayer.player.name}
+              {leftPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
+            <div className="text-xs text-yellow-400 mt-0.5">🪙 {leftPlayer.player.score}</div>
             <div className="mt-2 flex flex-col -space-y-6">
               {/* Vertical Card Backs */}
               {Array.from({ length: 5 }).map((_, i) => (
@@ -194,12 +222,14 @@ export default function Room() {
         {/* Right Player */}
         {rightPlayer && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center mb-2 shadow-lg">
+            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${rightPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {rightPlayer.player.name[0]}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
               {rightPlayer.player.name}
+              {rightPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
+            <div className="text-xs text-yellow-400 mt-0.5">🪙 {rightPlayer.player.score}</div>
             <div className="mt-2 flex flex-col -space-y-6">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
@@ -250,6 +280,9 @@ export default function Room() {
           </div>
         </div>
       </div>
+
+      {/* Chat Panel */}
+      <ChatPanel />
     </div>
   )
 }

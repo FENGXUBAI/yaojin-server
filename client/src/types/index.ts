@@ -20,8 +20,16 @@ export interface Player {
   ready: boolean
   score: number
   isBot?: boolean
+  isTrusteeship?: boolean
   connected: boolean
   clientKey?: string
+}
+
+export interface ChatMessage {
+  sender: string
+  message: string
+  isEmoji?: boolean
+  timestamp: number
 }
 
 export interface Room {
@@ -59,6 +67,7 @@ export interface GameState {
 
 export interface RoomStatePayload {
   players: Player[]
+  playerCount?: number
   gameState: GameState | null
   owner: string
   matchHistory: any[]
