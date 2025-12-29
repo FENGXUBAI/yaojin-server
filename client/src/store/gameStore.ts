@@ -90,6 +90,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   createRoom: async (playerCount: number) => {
+    // Ensure socket exists early; emits will be buffered until connected.
+    get().connect()
+
     const user = useUserStore.getState().user
     if (!user) throw new Error('未登录')
 
@@ -130,6 +133,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   joinRoom: async (roomId: string) => {
+    // Ensure socket exists early; emits will be buffered until connected.
+    get().connect()
+
     const user = useUserStore.getState().user
     if (!user) throw new Error('未登录')
 
@@ -169,6 +175,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   quickMatch: async () => {
+    // Ensure socket exists early; emits will be buffered until connected.
+    get().connect()
+
     const user = useUserStore.getState().user
     if (!user) throw new Error('未登录')
 

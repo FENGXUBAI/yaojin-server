@@ -323,8 +323,14 @@ app.use((req, res) => {
 const io = new socket_io_1.Server(httpServer, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+    },
+    // Improve connection stability (especially behind reverse proxies)
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    // Avoid long-polling on platforms without sticky sessions
+    transports: ['websocket'],
+    allowUpgrades: true,
 });
 const rooms = new Map();
 const socketRoom = new Map();
@@ -567,7 +573,7 @@ function emitPrivateState(r) {
     }
 }
 io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
+    console.log('Client connected:', socket.id, 'transport:', socket.conn.transport.name);
     socket.on('listRooms', () => {
         if (isRateLimited(socket.id, 1000))
             return;
@@ -600,6 +606,13 @@ io.on('connection', (socket) => {
     socket.on('join', ({ room, name, clientKey, lastSfxSeq, lastMvpSeq }) => {
         if (isRateLimited(socket.id, 200))
             return;
+        console.log('[join] request', {
+            socketId: socket.id,
+            room,
+            name,
+            hasClientKey: !!(clientKey && String(clientKey).trim()),
+            transport: socket.conn.transport.name,
+        });
         socket.join(room);
         let r = rooms.get(room);
         if (!r) {
@@ -969,9 +982,9 @@ io.on('connection', (socket) => {
             console.error('Debug win error:', e);
         }
     });
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
+    socket.on('disconnect', (reason) => {
         const room = socketRoom.get(socket.id);
+        console.log('Client disconnected:', socket.id, 'reason:', reason, 'transport:', socket.conn.transport.name, 'room:', room);
         socketRoom.delete(socket.id);
         socketClientKey.delete(socket.id);
         if (!room)
