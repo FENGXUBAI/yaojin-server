@@ -6,12 +6,36 @@ import { gameSocket } from '@/services/socket'
 import toast from 'react-hot-toast'
 import Card from '@/components/Card'
 import ChatPanel from '@/components/ChatPanel'
-import { Bot } from 'lucide-react'
+import { Bot, Clock } from 'lucide-react'
+
+function CountdownTimer({ duration, startTime }: { duration: number, startTime: number }) {
+  const [timeLeft, setTimeLeft] = useState(0)
+
+  useEffect(() => {
+    const update = () => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      const remaining = Math.max(0, duration - elapsed)
+      setTimeLeft(remaining)
+    }
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [duration, startTime])
+
+  if (timeLeft <= 0) return null
+
+  return (
+    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 shadow-lg border border-slate-600 z-20">
+      <Clock size={14} className="text-yellow-400" />
+      <span className={timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-white'}>{timeLeft}s</span>
+    </div>
+  )
+}
 
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
-  const { room, gameState, joinRoom, leaveRoom, isConnected, playCards, pass, startGame, setTrusteeship } = useGameStore()
+  const { room, gameState, turnTimer, joinRoom, leaveRoom, isConnected, playCards, pass, startGame, setTrusteeship } = useGameStore()
   const user = useUserStore(state => state.user)
   const [selectedCards, setSelectedCards] = useState<number[]>([]) // Indices of selected cards
 
@@ -182,6 +206,9 @@ export default function Room() {
         {/* Top Player (if 4 players) */}
         {topPlayer && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
+            {isPlaying && gameState.currentPlayer === topPlayer.index && turnTimer && (
+              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+            )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${topPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {topPlayer.player.name[0]}
             </div>
@@ -190,9 +217,14 @@ export default function Room() {
               {topPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
             <div className="text-xs text-yellow-400 mt-0.5">🪙 {topPlayer.player.score}</div>
+            {isPlaying && (
+               <div className="text-xs text-blue-300 mt-0.5 font-mono bg-black/30 px-1.5 rounded">
+                 剩 {gameState.handCounts?.[topPlayer.index] ?? 0} 张
+               </div>
+            )}
             <div className="mt-2 flex -space-x-1">
               {/* Card Backs */}
-              {Array.from({ length: 5 }).map((_, i) => ( // Mock count
+              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 5) }).map((_, i) => ( 
                 <div key={i} className="w-6 h-8 bg-blue-600 rounded border border-white/20 shadow-sm" />
               ))}
             </div>
@@ -202,6 +234,9 @@ export default function Room() {
         {/* Left Player */}
         {leftPlayer && (
           <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
+            {isPlaying && gameState.currentPlayer === leftPlayer.index && turnTimer && (
+              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+            )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${leftPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {leftPlayer.player.name[0]}
             </div>
@@ -210,9 +245,14 @@ export default function Room() {
               {leftPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
             <div className="text-xs text-yellow-400 mt-0.5">🪙 {leftPlayer.player.score}</div>
+            {isPlaying && (
+               <div className="text-xs text-blue-300 mt-0.5 font-mono bg-black/30 px-1.5 rounded">
+                 剩 {gameState.handCounts?.[leftPlayer.index] ?? 0} 张
+               </div>
+            )}
             <div className="mt-2 flex flex-col -space-y-6">
               {/* Vertical Card Backs */}
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 5) }).map((_, i) => (
                 <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
               ))}
             </div>
@@ -222,6 +262,9 @@ export default function Room() {
         {/* Right Player */}
         {rightPlayer && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
+            {isPlaying && gameState.currentPlayer === rightPlayer.index && turnTimer && (
+              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+            )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${rightPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {rightPlayer.player.name[0]}
             </div>
@@ -230,8 +273,13 @@ export default function Room() {
               {rightPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
             <div className="text-xs text-yellow-400 mt-0.5">🪙 {rightPlayer.player.score}</div>
+            {isPlaying && (
+               <div className="text-xs text-blue-300 mt-0.5 font-mono bg-black/30 px-1.5 rounded">
+                 剩 {gameState.handCounts?.[rightPlayer.index] ?? 0} 张
+               </div>
+            )}
             <div className="mt-2 flex flex-col -space-y-6">
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 5) }).map((_, i) => (
                 <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
               ))}
             </div>
@@ -240,6 +288,14 @@ export default function Room() {
 
         {/* My Hand (Bottom) */}
         <div className="absolute bottom-0 left-0 right-0 pb-4 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent flex flex-col items-center z-20">
+          
+          {/* My Timer */}
+          {isMyTurn && turnTimer && (
+            <div className="relative mb-8">
+               <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+            </div>
+          )}
+
           {/* Action Buttons */}
           {isMyTurn && (
             <div className="flex gap-4 mb-6 animate-bounce-slow pointer-events-auto">

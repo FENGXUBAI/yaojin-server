@@ -41,6 +41,11 @@ export interface Room {
   gameState?: GameState | null
 }
 
+export interface TurnTimerPayload {
+  duration: number
+  startTime: number
+}
+
 export interface Pattern {
   type: 'SINGLE' | 'PAIR' | 'TRIPLE' | 'FOUR' | 'STRAIGHT' | 'DOUBLE_SEQUENCE'
   cards: Card[]

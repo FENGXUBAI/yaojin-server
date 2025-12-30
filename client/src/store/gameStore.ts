@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { gameSocket } from '@/services/socket'
-import { Room, GameState, RoomStatePayload, Card, ChatMessage } from '@/types'
+import { Room, GameState, RoomStatePayload, Card, ChatMessage, TurnTimerPayload } from '@/types'
 import { useUserStore } from './userStore'
 import toast from 'react-hot-toast'
 import { playSfx } from '@/services/sfx'
@@ -10,6 +10,7 @@ let listenersBound = false
 interface GameStore {
   room: Room | null
   gameState: GameState | null
+  turnTimer: TurnTimerPayload | null
   isConnected: boolean
   clientKey: string | null
   chatMessages: ChatMessage[]
@@ -36,6 +37,7 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set, get) => ({
   room: null,
   gameState: null,
+  turnTimer: null,
   isConnected: false,
   clientKey: null,
   chatMessages: [],
@@ -91,7 +93,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         playSfx(evt)
       })
 
+      gameSocket.on('turnTimer', (data: TurnTimerPayload) => {
+        set({ turnTimer: data })
+      })
+
       gameSocket.on('chatMessage', (msg: ChatMessage) => {
+        try {
+          const audio = new Audio('/assets/sounds/select.mp3')
+          audio.volume = 0.5
+          void audio.play()
+        } catch (e) {
+          console.error('Failed to play chat sound', e)
+        }
         set(state => ({
           chatMessages: [...state.chatMessages.slice(-29), msg]
         }))
