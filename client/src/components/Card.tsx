@@ -50,7 +50,9 @@ export default function Card({ card, selected, onClick, scale = 1, hidden }: Car
     >
       {/* Top Left */}
       <div className="self-start flex flex-col items-center leading-none">
-        <span className="font-bold text-lg">{isJoker ? 'J' : displayRank}</span>
+        <span className={clsx("font-bold", isJoker ? "text-sm writing-vertical-rl mt-1" : "text-lg")}>
+          {displayRank}
+        </span>
         {!isJoker && <span className="text-lg">{card.suit}</span>}
       </div>
 

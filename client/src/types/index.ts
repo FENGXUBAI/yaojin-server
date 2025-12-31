@@ -64,6 +64,7 @@ export interface GameState {
   passesInRow: number
   lastPlayOwner: number | null
   tablePlays: { by: number; cards: Card[] }[]
+  currentTrickPlays: { by: number; cards: Card[] }[]
   finishedOrder: number[]
   revolution: boolean
   status: 'playing' | 'tribute' | 'tribute_return'
