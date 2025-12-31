@@ -301,9 +301,9 @@ export function playTurn(state: GameState, action: Action): GameState {
       // Update Multiplier for Capture (Qi)
       let newMultiplier = state.multiplier;
       if (captureType === 'TRIPLE') { // Qi Hong (3 fours)
-          newMultiplier *= 4; 
+          newMultiplier *= 40; 
       } else if (captureType === 'PAIR') { // Qi Zha (2 fours)
-          newMultiplier *= 2;
+          newMultiplier *= 20;
       }
 
       const nextState: GameState = {
@@ -391,10 +391,12 @@ export function playTurn(state: GameState, action: Action): GameState {
   
   // Update Multiplier
   let newMultiplier = state.multiplier;
-  if (pattern.type === 'FOUR') {
-      newMultiplier *= 2; // Bomb x2
+  if (pattern.type === 'TRIPLE') {
+      newMultiplier *= 20; // Bomb (Triple) x20
+  } else if (pattern.type === 'FOUR') {
+      newMultiplier *= 40; // Hong (Four) x40
   } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
-      newMultiplier *= 4; // King Bomb x4
+      newMultiplier *= 40; // King Bomb x40 (Treat as Hong level)
   }
   // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
   if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {

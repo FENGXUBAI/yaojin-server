@@ -8,6 +8,7 @@ import Card from '@/components/Card'
 import ChatPanel from '@/components/ChatPanel'
 import VFXOverlay from '@/components/VFXOverlay'
 import { Bot, Clock } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
   const [timeLeft, setTimeLeft] = useState(0)
@@ -226,11 +227,13 @@ export default function Room() {
             </div>
           ) : (
             <div className="relative w-full h-full max-w-4xl max-h-[600px]">
-              {/* Table Plays (Current Trick) */}
-              {gameState.currentTrickPlays?.map((play, idx) => {
+              {/* Table Plays (Accumulated) */}
+              {gameState.tablePlays?.map((play, idx) => {
                 const playerIndex = play.by
                 // Calculate relative position
                 let posClass = ''
+                let offsetStyle = { transform: `translate(${idx * 2}px, ${idx * 2}px)` } // Stack effect
+
                 if (playerIndex === myIndex) {
                    posClass = 'left-1/2 top-[60%] -translate-x-1/2' // My play
                 } else if (rightPlayer && playerIndex === rightPlayer.index) {
@@ -241,11 +244,16 @@ export default function Room() {
                    posClass = 'left-[20%] top-1/2 -translate-y-1/2' // Left play
                 }
                 
+                // Only show the last few plays per player to avoid clutter, or stack them?
+                // User wants "all played cards kept". We can stack them.
+                // To avoid total chaos, we might want to group them by trick or just pile them.
+                // Let's just render them all but with z-index increasing.
+                
                 return (
-                  <div key={`${playerIndex}-${idx}`} className={`absolute ${posClass} flex flex-col items-center z-10 transition-all duration-300`}>
+                  <div key={`${playerIndex}-${idx}`} className={`absolute ${posClass} flex flex-col items-center transition-all duration-300`} style={{ zIndex: idx, ...offsetStyle }}>
                      <div className="flex -space-x-8">
                        {play.cards.map((c, i) => (
-                         <Card key={i} card={c} scale={0.8} /> 
+                         <Card key={i} card={c} scale={0.6} /> 
                        ))}
                      </div>
                   </div>
@@ -272,7 +280,7 @@ export default function Room() {
               {topPlayer.player.name}
               {topPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
-            <div className="text-xs text-yellow-400 mt-0.5">🪙 {topPlayer.player.score}</div>
+            <div className="text-xs text-yellow-400 mt-0.5">💰 {topPlayer.player.score}</div>
             <div className="mt-2 flex -space-x-1">
               {/* Card Backs */}
               {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 5) }).map((_, i) => ( 
@@ -295,7 +303,7 @@ export default function Room() {
               {leftPlayer.player.name}
               {leftPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
-            <div className="text-xs text-yellow-400 mt-0.5">🪙 {leftPlayer.player.score}</div>
+            <div className="text-xs text-yellow-400 mt-0.5">💰 {leftPlayer.player.score}</div>
             <div className="mt-2 flex flex-col -space-y-6">
               {/* Vertical Card Backs */}
               {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 5) }).map((_, i) => (
@@ -318,7 +326,7 @@ export default function Room() {
               {rightPlayer.player.name}
               {rightPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
             </div>
-            <div className="text-xs text-yellow-400 mt-0.5">🪙 {rightPlayer.player.score}</div>
+            <div className="text-xs text-yellow-400 mt-0.5">💰 {rightPlayer.player.score}</div>
             <div className="mt-2 flex flex-col -space-y-6">
               {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 5) }).map((_, i) => (
                 <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
@@ -429,7 +437,14 @@ export default function Room() {
           {/* Hand Cards */}
           <div className="flex -space-x-8 hover:-space-x-4 transition-all duration-300 px-4 overflow-x-auto max-w-full pb-4 pt-4 min-h-[160px] items-end">
             {myHand.map((card, idx) => (
-              <div key={`${card.rank}-${card.suit}-${idx}`} className="relative transition-transform hover:-translate-y-6 origin-bottom">
+              <motion.div 
+                key={`${card.rank}-${card.suit}-${idx}`} 
+                className="relative origin-bottom"
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: idx * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
+                whileHover={{ y: -24 }}
+              >
                 <Card 
                   card={card} 
                   selected={
@@ -444,7 +459,7 @@ export default function Room() {
                   }}
                   scale={1.1}
                 />
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

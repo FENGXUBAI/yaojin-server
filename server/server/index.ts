@@ -1125,7 +1125,7 @@ io.on('connection', (socket: Socket) => {
          if (r.turnTimer) clearTimeout(r.turnTimer);
          
          // Calculate Scores
-         const baseScore = 1000;
+         const baseScore = 100;
          const multiplier = nextState.multiplier;
          const totalStake = baseScore * multiplier;
          const finished = nextState.finishedOrder;
