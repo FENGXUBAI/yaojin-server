@@ -93,8 +93,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
         playSfx(evt)
       })
 
-      gameSocket.on('turnTimer', (data: TurnTimerPayload) => {
-        set({ turnTimer: data })
+      gameSocket.on('turnTimer', (data: any) => {
+        // 兼容旧字段 duration(毫秒) 与新字段 durationMs(毫秒)
+        const durationMs = typeof data?.durationMs === 'number'
+          ? data.durationMs
+          : (typeof data?.duration === 'number' ? data.duration : 25000)
+        const startTime = typeof data?.startTime === 'number' ? data.startTime : Date.now()
+        set({ turnTimer: { durationMs, startTime } })
       })
 
       gameSocket.on('chatMessage', (msg: ChatMessage) => {

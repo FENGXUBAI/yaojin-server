@@ -42,7 +42,7 @@ export interface Room {
 }
 
 export interface TurnTimerPayload {
-  duration: number
+  durationMs: number
   startTime: number
 }
 
@@ -66,7 +66,9 @@ export interface GameState {
   tablePlays: { by: number; cards: Card[] }[]
   finishedOrder: number[]
   revolution: boolean
-  status: 'playing' | 'tribute_return'
+  status: 'playing' | 'tribute' | 'tribute_return'
+  pendingTributes?: { actionBy: number; giveTo: number; count: number }[]
+  pendingReturns?: { actionBy: number; returnTo: number; count: number }[]
   multiplier: number
 }
 

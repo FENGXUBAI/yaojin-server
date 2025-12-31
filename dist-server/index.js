@@ -518,10 +518,13 @@ function startTurnTimer(room) {
             compareAgainst = null;
         }
     }
-    const canPlay = (0, game_1.hasValidMove)(hand, compareAgainst);
-    const duration = canPlay ? 25000 : 3000;
+    // 统一每回合最多 25 秒（固定 25 秒），保证体验一致，避免“3 秒超时 -> 全员托管”错觉。
+    // 仍保留 hasValidMove 计算，未来可扩展强制不要逻辑。
+    const _canPlay = (0, game_1.hasValidMove)(hand, compareAgainst);
+    void _canPlay;
+    const duration = 25000;
     // Emit timer info to clients (optional, but good for UI)
-    io.to(room.id).emit('turnTimer', { duration, startTime: Date.now() });
+    io.to(room.id).emit('turnTimer', { durationMs: duration, duration, startTime: Date.now() });
     room.turnTimer = setTimeout(() => {
         // Timeout -> Enable Trusteeship
         console.log(`Timeout for room ${room.id}, player ${currentPlayerIdx} -> Enabling Trusteeship`);
@@ -763,6 +766,19 @@ io.on('connection', (socket) => {
         if (pIdx === -1)
             return;
         const state = r.gameState;
+        // Tribute stage: suggest max cards to tribute.
+        if (state.status === 'tribute') {
+            const pending = state.pendingTributes?.find((pr) => pr.actionBy === pIdx);
+            if (!pending) {
+                socket.emit('hints', { hintKey, options: [] });
+                return;
+            }
+            const hand = state.hands[pIdx] ?? [];
+            const sorted = [...hand].sort((a, b) => b.sortValue - a.sortValue);
+            const pick = sorted.slice(0, pending.count);
+            socket.emit('hints', { hintKey, options: pick.length === pending.count ? [pick] : [] });
+            return;
+        }
         // Tribute return stage: suggest lowest cards to return.
         if (state.status === 'tribute_return') {
             const pending = state.pendingReturns?.find(pr => pr.actionBy === pIdx);
@@ -812,7 +828,10 @@ io.on('connection', (socket) => {
                 return;
             const prevFinishedCount = r.gameState.finishedOrder.length;
             let nextState;
-            if (action.type === 'returnTribute') {
+            if (action.type === 'tribute') {
+                nextState = (0, game_1.resolveTribute)(r.gameState, pIdx, action.cards);
+            }
+            else if (action.type === 'returnTribute') {
                 nextState = (0, game_1.resolveReturnTribute)(r.gameState, pIdx, action.cards);
             }
             else {
@@ -916,8 +935,10 @@ io.on('connection', (socket) => {
                 emitRoomState(r);
             }
             else {
-                // Start timer for next player
-                startTurnTimer(r);
+                // 只有进入 playing 阶段才启动计时器
+                if (r.gameState?.status === 'playing') {
+                    startTurnTimer(r);
+                }
             }
         }
         catch (e) {

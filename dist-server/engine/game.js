@@ -4,6 +4,7 @@ exports.formatCard = exports.createDeck = void 0;
 exports.dealHands = dealHands;
 exports.findSpade4Owner = findSpade4Owner;
 exports.initGame = initGame;
+exports.resolveTribute = resolveTribute;
 exports.playTurn = playTurn;
 exports.forceWin = forceWin;
 exports.checkRevolution = checkRevolution;
@@ -42,6 +43,7 @@ function initGame(opts) {
     let hands = dealHands(deck, opts.playerCount);
     let firstPlayer = 0;
     let revolution = false;
+    const pendingTributes = [];
     const pendingReturns = [];
     if (!opts.lastRoundResult) {
         // 第一局：♠4 先手
@@ -54,15 +56,10 @@ function initGame(opts) {
         revolution = checkRevolution(hands, finishedOrder);
         // Compute Tribute
         const plan = computeTributePlan(opts.playerCount, finishedOrder, revolution);
-        // Apply Tribute (Donor -> Receiver)
-        hands = applyTribute(hands, plan);
-        // Prepare Manual Return Tribute
+        // 手动进贡：等待 donor 点击确认把“最大牌”交给 receiver
         for (const { donor, receiver, count } of plan.donorToReceiver) {
-            pendingReturns.push({ actionBy: receiver, returnTo: donor, count });
+            pendingTributes.push({ actionBy: donor, giveTo: receiver, count });
         }
-        // Re-sort all hands
-        for (const h of hands)
-            h.sort((a, b) => b.sortValue - a.sortValue);
         if (revolution) {
             // 革命：第一个跑了的人先出 (Winner)
             firstPlayer = finishedOrder[0];
@@ -84,10 +81,67 @@ function initGame(opts) {
         currentTrickPlays: [],
         finishedOrder: [],
         revolution,
-        status: pendingReturns.length > 0 ? 'tribute_return' : 'playing',
+        status: pendingTributes.length > 0 ? 'tribute' : (pendingReturns.length > 0 ? 'tribute_return' : 'playing'),
+        pendingTributes,
         pendingReturns,
         multiplier: 1,
         jiefengState: null,
+    };
+}
+function sameCard(a, b) {
+    return a.rank === b.rank && a.suit === b.suit;
+}
+function pickMaxCards(hand, count) {
+    const sorted = [...hand].sort((a, b) => b.sortValue - a.sortValue);
+    return sorted.slice(0, count);
+}
+function cardsMatchExpected(selected, expected) {
+    if (selected.length !== expected.length)
+        return false;
+    const remaining = [...expected];
+    for (const c of selected) {
+        const idx = remaining.findIndex(e => sameCard(e, c));
+        if (idx < 0)
+            return false;
+        remaining.splice(idx, 1);
+    }
+    return remaining.length === 0;
+}
+function resolveTribute(state, playerId, cards) {
+    if (state.status !== 'tribute')
+        throw new Error('Not in tribute phase');
+    const pendingIdx = state.pendingTributes.findIndex(p => p.actionBy === playerId);
+    if (pendingIdx === -1)
+        throw new Error('You do not need to tribute');
+    const pending = state.pendingTributes[pendingIdx];
+    if (cards.length !== pending.count)
+        throw new Error(`Must tribute exactly ${pending.count} cards`);
+    const donorHand = state.hands[playerId] ?? [];
+    const expected = pickMaxCards(donorHand, pending.count);
+    if (!cardsMatchExpected(cards, expected)) {
+        throw new Error('进贡必须选择自己手牌中最大的牌');
+    }
+    const newHands = state.hands.map(h => [...h]);
+    const donorAfter = removeCardsFromHand(newHands[playerId], cards);
+    newHands[playerId] = donorAfter;
+    const marked = cards.map(c => ({ ...c, isTribute: true }));
+    newHands[pending.giveTo].push(...marked);
+    // Re-sort
+    newHands[playerId].sort((a, b) => b.sortValue - a.sortValue);
+    newHands[pending.giveTo].sort((a, b) => b.sortValue - a.sortValue);
+    const newPendingTributes = [...state.pendingTributes];
+    newPendingTributes.splice(pendingIdx, 1);
+    const newPendingReturns = [...state.pendingReturns];
+    newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
+    const nextStatus = newPendingTributes.length === 0
+        ? (newPendingReturns.length === 0 ? 'playing' : 'tribute_return')
+        : 'tribute';
+    return {
+        ...state,
+        hands: newHands,
+        pendingTributes: newPendingTributes,
+        pendingReturns: newPendingReturns,
+        status: nextStatus,
     };
 }
 function removeCardsFromHand(hand, toRemove) {

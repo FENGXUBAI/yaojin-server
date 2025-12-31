@@ -13,7 +13,8 @@ export interface GameState {
   currentTrickPlays: TablePlay[]; // Plays in the current trick
   finishedOrder: number[]; // players who have "跑了"
   revolution: boolean; // 是否革命（用于下一局先手与进贡）
-  status: 'playing' | 'tribute_return';
+  status: 'playing' | 'tribute' | 'tribute_return';
+  pendingTributes: { actionBy: number; giveTo: number; count: number }[];
   pendingReturns: { actionBy: number; returnTo: number; count: number }[];
   multiplier: number; // Current game score multiplier
   jiefengState: JiefengState | null; // 接风状态
@@ -34,8 +35,9 @@ export interface TablePlay {
 
 export type PlayAction = { type: 'play'; cards: Card[] };
 export type PassAction = { type: 'pass' };
+export type TributeAction = { type: 'tribute'; cards: Card[] };
 export type ReturnTributeAction = { type: 'returnTribute'; cards: Card[] };
-export type Action = PlayAction | PassAction | ReturnTributeAction;
+export type Action = PlayAction | PassAction | TributeAction | ReturnTributeAction;
 
 export function dealHands(deck: Card[], playerCount: number): Card[][] {
   const shuffled = shuffle(deck);
@@ -64,6 +66,7 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
   
   let firstPlayer = 0;
   let revolution = false;
+  const pendingTributes: { actionBy: number; giveTo: number; count: number }[] = [];
   const pendingReturns: { actionBy: number; returnTo: number; count: number }[] = [];
 
   if (!opts.lastRoundResult) {
@@ -78,17 +81,11 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
     
     // Compute Tribute
     const plan = computeTributePlan(opts.playerCount, finishedOrder, revolution);
-    
-    // Apply Tribute (Donor -> Receiver)
-    hands = applyTribute(hands, plan);
-    
-    // Prepare Manual Return Tribute
+
+    // 手动进贡：等待 donor 点击确认把“最大牌”交给 receiver
     for (const { donor, receiver, count } of plan.donorToReceiver) {
-        pendingReturns.push({ actionBy: receiver, returnTo: donor, count });
+      pendingTributes.push({ actionBy: donor, giveTo: receiver, count });
     }
-    
-    // Re-sort all hands
-    for (const h of hands) h.sort((a,b) => b.sortValue - a.sortValue);
 
     if (revolution) {
       // 革命：第一个跑了的人先出 (Winner)
@@ -111,10 +108,76 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
     currentTrickPlays: [],
     finishedOrder: [],
     revolution,
-    status: pendingReturns.length > 0 ? 'tribute_return' : 'playing',
+    status: pendingTributes.length > 0 ? 'tribute' : (pendingReturns.length > 0 ? 'tribute_return' : 'playing'),
+    pendingTributes,
     pendingReturns,
     multiplier: 1,
     jiefengState: null,
+  };
+}
+
+function sameCard(a: Card, b: Card): boolean {
+  return a.rank === b.rank && a.suit === b.suit;
+}
+
+function pickMaxCards(hand: Card[], count: number): Card[] {
+  const sorted = [...hand].sort((a, b) => b.sortValue - a.sortValue);
+  return sorted.slice(0, count);
+}
+
+function cardsMatchExpected(selected: Card[], expected: Card[]): boolean {
+  if (selected.length !== expected.length) return false;
+  const remaining = [...expected];
+  for (const c of selected) {
+    const idx = remaining.findIndex(e => sameCard(e, c));
+    if (idx < 0) return false;
+    remaining.splice(idx, 1);
+  }
+  return remaining.length === 0;
+}
+
+export function resolveTribute(state: GameState, playerId: number, cards: Card[]): GameState {
+  if (state.status !== 'tribute') throw new Error('Not in tribute phase');
+
+  const pendingIdx = state.pendingTributes.findIndex(p => p.actionBy === playerId);
+  if (pendingIdx === -1) throw new Error('You do not need to tribute');
+
+  const pending = state.pendingTributes[pendingIdx];
+  if (cards.length !== pending.count) throw new Error(`Must tribute exactly ${pending.count} cards`);
+
+  const donorHand = state.hands[playerId] ?? [];
+  const expected = pickMaxCards(donorHand, pending.count);
+  if (!cardsMatchExpected(cards, expected)) {
+    throw new Error('进贡必须选择自己手牌中最大的牌');
+  }
+
+  const newHands = state.hands.map(h => [...h]);
+  const donorAfter = removeCardsFromHand(newHands[playerId], cards);
+  newHands[playerId] = donorAfter;
+
+  const marked = cards.map(c => ({ ...c, isTribute: true } as any));
+  newHands[pending.giveTo].push(...marked);
+
+  // Re-sort
+  newHands[playerId].sort((a,b) => b.sortValue - a.sortValue);
+  newHands[pending.giveTo].sort((a,b) => b.sortValue - a.sortValue);
+
+  const newPendingTributes = [...state.pendingTributes];
+  newPendingTributes.splice(pendingIdx, 1);
+
+  const newPendingReturns = [...state.pendingReturns];
+  newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
+
+  const nextStatus = newPendingTributes.length === 0
+    ? (newPendingReturns.length === 0 ? 'playing' : 'tribute_return')
+    : 'tribute';
+
+  return {
+    ...state,
+    hands: newHands,
+    pendingTributes: newPendingTributes,
+    pendingReturns: newPendingReturns,
+    status: nextStatus,
   };
 }
 
@@ -631,7 +694,7 @@ export function resolveReturnTribute(state: GameState, playerId: number, cards: 
         ...state,
         hands: newHands,
         pendingReturns: newPending,
-        status: nextStatus
+      status: nextStatus
     };
 }
 

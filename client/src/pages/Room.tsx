@@ -8,19 +8,19 @@ import Card from '@/components/Card'
 import ChatPanel from '@/components/ChatPanel'
 import { Bot, Clock } from 'lucide-react'
 
-function CountdownTimer({ duration, startTime }: { duration: number, startTime: number }) {
+function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
   const [timeLeft, setTimeLeft] = useState(0)
 
   useEffect(() => {
     const update = () => {
-      const elapsed = Math.floor((Date.now() - startTime) / 1000)
-      const remaining = Math.max(0, duration - elapsed)
-      setTimeLeft(remaining)
+      const remainingMs = Math.max(0, durationMs - (Date.now() - startTime))
+      const remainingSec = Math.ceil(remainingMs / 1000)
+      setTimeLeft(remainingSec)
     }
     update()
     const timer = setInterval(update, 1000)
     return () => clearInterval(timer)
-  }, [duration, startTime])
+  }, [durationMs, startTime])
 
   if (timeLeft <= 0) return null
 
@@ -38,6 +38,8 @@ export default function Room() {
   const { room, gameState, turnTimer, joinRoom, leaveRoom, isConnected, playCards, pass, startGame, setTrusteeship } = useGameStore()
   const user = useUserStore(state => state.user)
   const [selectedCards, setSelectedCards] = useState<number[]>([]) // Indices of selected cards
+  const [selectedTributeCards, setSelectedTributeCards] = useState<number[]>([])
+  const [selectedReturnCards, setSelectedReturnCards] = useState<number[]>([])
 
   useEffect(() => {
     if (!user) {
@@ -114,6 +116,45 @@ export default function Room() {
   const isPlaying = room.status === 'playing' && gameState
   const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
+
+  const pendingTribute = isPlaying ? gameState.pendingTributes?.find(p => p.actionBy === myIndex) : undefined
+  const pendingReturn = isPlaying ? gameState.pendingReturns?.find(p => p.actionBy === myIndex) : undefined
+  const isTributePhase = isPlaying && gameState.status === 'tribute'
+  const isReturnPhase = isPlaying && gameState.status === 'tribute_return'
+
+  const toggleTributeCard = (index: number) => {
+    setSelectedTributeCards(prev =>
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    )
+  }
+
+  const toggleReturnCard = (index: number) => {
+    setSelectedReturnCards(prev =>
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    )
+  }
+
+  const handleSubmitTribute = () => {
+    if (!isPlaying || !pendingTribute || myIndex === -1) return
+    const cards = selectedTributeCards.map(i => myHand[i]).filter(Boolean)
+    if (cards.length !== pendingTribute.count) {
+      toast.error(`请选择 ${pendingTribute.count} 张进贡牌`)
+      return
+    }
+    gameSocket.emit('action', { room: room.id, action: { type: 'tribute', cards } })
+    setSelectedTributeCards([])
+  }
+
+  const handleSubmitReturn = () => {
+    if (!isPlaying || !pendingReturn || myIndex === -1) return
+    const cards = selectedReturnCards.map(i => myHand[i]).filter(Boolean)
+    if (cards.length !== pendingReturn.count) {
+      toast.error(`请选择 ${pendingReturn.count} 张回贡牌`)
+      return
+    }
+    gameSocket.emit('action', { room: room.id, action: { type: 'returnTribute', cards } })
+    setSelectedReturnCards([])
+  }
 
   // Check trusteeship status of current player
   const myPlayer = myIndex !== -1 ? room.players[myIndex] : null
@@ -207,7 +248,7 @@ export default function Room() {
         {topPlayer && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
             {isPlaying && gameState.currentPlayer === topPlayer.index && turnTimer && (
-              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+              <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${topPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {topPlayer.player.name[0]}
@@ -235,7 +276,7 @@ export default function Room() {
         {leftPlayer && (
           <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
             {isPlaying && gameState.currentPlayer === leftPlayer.index && turnTimer && (
-              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+              <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${leftPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {leftPlayer.player.name[0]}
@@ -263,7 +304,7 @@ export default function Room() {
         {rightPlayer && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
             {isPlaying && gameState.currentPlayer === rightPlayer.index && turnTimer && (
-              <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+              <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
             <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${rightPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
               {rightPlayer.player.name[0]}
@@ -292,7 +333,64 @@ export default function Room() {
           {/* My Timer */}
           {isMyTurn && turnTimer && (
             <div className="relative mb-8">
-               <CountdownTimer duration={turnTimer.duration} startTime={turnTimer.startTime} />
+               <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
+            </div>
+          )}
+
+          {/* Tribute / Return UI */}
+          {isPlaying && (isTributePhase || isReturnPhase) && (
+            <div className="mb-4 pointer-events-auto">
+              {isTributePhase && (
+                <div className="text-center">
+                  {pendingTribute ? (
+                    <div className="space-y-2">
+                      <div className="text-white font-bold">进贡阶段：请选择 {pendingTribute.count} 张最大牌并确认</div>
+                      <div className="flex justify-center gap-3">
+                        <button
+                          onClick={() => setSelectedTributeCards([])}
+                          className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-full font-bold"
+                        >
+                          重选
+                        </button>
+                        <button
+                          onClick={handleSubmitTribute}
+                          className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-full font-bold"
+                        >
+                          确认进贡
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-300">等待其他玩家进贡…</div>
+                  )}
+                </div>
+              )}
+
+              {isReturnPhase && (
+                <div className="text-center">
+                  {pendingReturn ? (
+                    <div className="space-y-2">
+                      <div className="text-white font-bold">回贡阶段：请选择 {pendingReturn.count} 张牌并确认</div>
+                      <div className="flex justify-center gap-3">
+                        <button
+                          onClick={() => setSelectedReturnCards([])}
+                          className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-full font-bold"
+                        >
+                          重选
+                        </button>
+                        <button
+                          onClick={handleSubmitReturn}
+                          className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-full font-bold"
+                        >
+                          确认回贡
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-300">等待其他玩家回贡…</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -327,8 +425,16 @@ export default function Room() {
               <div key={`${card.rank}-${card.suit}-${idx}`} className="relative transition-transform hover:-translate-y-6 origin-bottom">
                 <Card 
                   card={card} 
-                  selected={selectedCards.includes(idx)}
-                  onClick={() => toggleCard(idx)}
+                  selected={
+                    (isTributePhase ? selectedTributeCards.includes(idx) : false) ||
+                    (isReturnPhase ? selectedReturnCards.includes(idx) : false) ||
+                    (!isTributePhase && !isReturnPhase ? selectedCards.includes(idx) : false)
+                  }
+                  onClick={() => {
+                    if (isTributePhase) return toggleTributeCard(idx)
+                    if (isReturnPhase) return toggleReturnCard(idx)
+                    return toggleCard(idx)
+                  }}
                   scale={1.1}
                 />
               </div>
