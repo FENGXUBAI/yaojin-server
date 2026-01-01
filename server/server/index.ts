@@ -1303,6 +1303,24 @@ io.on('connection', (socket: Socket) => {
       isEmoji: isEmoji || false
     });
   });
+
+  // 互动表情/道具
+  socket.on('interaction', ({ room, targetId, type }: { room: string, targetId: string, type: string }) => {
+    if (isRateLimited(socket.id, 500)) return;
+    const r = rooms.get(room);
+    if (!r) return;
+    
+    const sender = r.players.find(p => p.id === socket.id);
+    const target = r.players.find(p => p.id === targetId);
+    
+    if (!sender || !target) return;
+
+    io.to(room).emit('interaction', {
+      senderId: sender.id,
+      targetId: target.id,
+      type
+    });
+  });
 });
 
 const PORT = Number(process.env.PORT) || 3000;

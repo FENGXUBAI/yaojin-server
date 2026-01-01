@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '@/store/gameStore'
 import { useUserStore } from '@/store/userStore'
@@ -7,6 +7,10 @@ import toast from 'react-hot-toast'
 import Card from '@/components/Card'
 import ChatPanel from '@/components/ChatPanel'
 import VFXOverlay from '@/components/VFXOverlay'
+import Character from '@/components/Character'
+import ChatBubble from '@/components/ChatBubble'
+import GameOverModal from '@/components/GameOverModal'
+import InteractionLayer, { InteractionEvent } from '@/components/InteractionLayer'
 import { Bot, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -42,6 +46,73 @@ export default function Room() {
   const [selectedCards, setSelectedCards] = useState<number[]>([]) // Indices of selected cards
   const [selectedTributeCards, setSelectedTributeCards] = useState<number[]>([])
   const [selectedReturnCards, setSelectedReturnCards] = useState<number[]>([])
+  
+  // New Features State
+  const [gameOverData, setGameOverData] = useState<any>(null)
+  const [interactions, setInteractions] = useState<InteractionEvent[]>([])
+  const [chatBubbles, setChatBubbles] = useState<{ playerId: string, message: string, isEmoji: boolean, id: number }[]>([])
+  const [interactionMenuTarget, setInteractionMenuTarget] = useState<string | null>(null)
+  
+  // Refs for positioning
+  const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    const onGameOver = (data: any) => {
+      setGameOverData(data)
+    }
+
+    const onInteraction = (data: { senderId: string, targetId: string, type: string }) => {
+      const senderEl = playerRefs.current[data.senderId]
+      const targetEl = playerRefs.current[data.targetId]
+      
+      if (senderEl && targetEl) {
+        const startRect = senderEl.getBoundingClientRect()
+        const endRect = targetEl.getBoundingClientRect()
+        
+        setInteractions(prev => [...prev, {
+          id: Date.now().toString() + Math.random(),
+          senderId: data.senderId,
+          targetId: data.targetId,
+          type: data.type,
+          startRect,
+          endRect
+        }])
+      }
+    }
+
+    const onChatMessage = (data: { player: string, message: string, isEmoji: boolean }) => {
+      // Find player ID by name (since chat event sends name currently, ideally should send ID)
+      // But wait, the chat event in index.ts sends { player: name, ... }
+      // I should probably update server to send ID, or find player by name here.
+      // Let's find by name for now.
+      const player = room?.players.find(p => p.name === data.player)
+      if (player) {
+        setChatBubbles(prev => [...prev, { 
+          playerId: player.id, 
+          message: data.message, 
+          isEmoji: data.isEmoji,
+          id: Date.now() 
+        }])
+      }
+    }
+
+    gameSocket.on('gameOver', onGameOver)
+    gameSocket.on('interaction', onInteraction)
+    gameSocket.on('chatMessage', onChatMessage)
+
+    return () => {
+      gameSocket.off('gameOver', onGameOver)
+      gameSocket.off('interaction', onInteraction)
+      gameSocket.off('chatMessage', onChatMessage)
+    }
+  }, [room])
+
+  const sendInteraction = (type: string) => {
+    if (interactionMenuTarget && room) {
+      gameSocket.emit('interaction', { room: room.id, targetId: interactionMenuTarget, type })
+      setInteractionMenuTarget(null)
+    }
+  }
 
   useEffect(() => {
     if (!user) {
@@ -269,75 +340,129 @@ export default function Room() {
         
         {/* Top Player (if 4 players) */}
         {topPlayer && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
+          <div 
+            ref={el => { if (el) playerRefs.current[topPlayer.player.id] = el }}
+            className="absolute top-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-30"
+          >
+            {/* Chat Bubble */}
+            {chatBubbles.filter(b => b.playerId === topPlayer.player.id).slice(-1).map(b => (
+              <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
+            ))}
+
             {isPlaying && gameState.currentPlayer === topPlayer.index && turnTimer && (
               <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
-            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${topPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
-              {topPlayer.player.name[0]}
+            
+            <Character 
+              name={topPlayer.player.name}
+              isMe={false}
+              isTurn={!!(isPlaying && gameState.currentPlayer === topPlayer.index)}
+              cardCount={isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 0}
+              onClick={() => setInteractionMenuTarget(topPlayer.player.id)}
+            />
+
+            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              💰 {topPlayer.player.score}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
-              {topPlayer.player.name}
-              {topPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
-            </div>
-            <div className="text-xs text-yellow-400 mt-0.5">💰 {topPlayer.player.score}</div>
-            <div className="mt-2 flex -space-x-1">
-              {/* Card Backs */}
-              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 5) }).map((_, i) => ( 
-                <div key={i} className="w-6 h-8 bg-blue-600 rounded border border-white/20 shadow-sm" />
-              ))}
-            </div>
+            
+            {topPlayer.player.isTrusteeship && (
+              <div className="absolute -right-8 top-0 bg-yellow-600 text-white text-xs px-1 rounded animate-pulse">
+                <Bot size={12} />
+              </div>
+            )}
           </div>
         )}
 
         {/* Left Player */}
         {leftPlayer && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
+          <div 
+            ref={el => { if (el) playerRefs.current[leftPlayer.player.id] = el }}
+            className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30"
+          >
+            {/* Chat Bubble */}
+            {chatBubbles.filter(b => b.playerId === leftPlayer.player.id).slice(-1).map(b => (
+              <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
+            ))}
+
             {isPlaying && gameState.currentPlayer === leftPlayer.index && turnTimer && (
               <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
-            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${leftPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
-              {leftPlayer.player.name[0]}
+            
+            <Character 
+              name={leftPlayer.player.name}
+              isMe={false}
+              isTurn={!!(isPlaying && gameState.currentPlayer === leftPlayer.index)}
+              cardCount={isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 0}
+              onClick={() => setInteractionMenuTarget(leftPlayer.player.id)}
+            />
+
+            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              💰 {leftPlayer.player.score}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
-              {leftPlayer.player.name}
-              {leftPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
-            </div>
-            <div className="text-xs text-yellow-400 mt-0.5">💰 {leftPlayer.player.score}</div>
-            <div className="mt-2 flex flex-col -space-y-6">
-              {/* Vertical Card Backs */}
-              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 5) }).map((_, i) => (
-                <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
-              ))}
-            </div>
+
+            {leftPlayer.player.isTrusteeship && (
+              <div className="absolute -right-8 top-0 bg-yellow-600 text-white text-xs px-1 rounded animate-pulse">
+                <Bot size={12} />
+              </div>
+            )}
           </div>
         )}
 
         {/* Right Player */}
         {rightPlayer && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center">
+          <div 
+            ref={el => { if (el) playerRefs.current[rightPlayer.player.id] = el }}
+            className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30"
+          >
+            {/* Chat Bubble */}
+            {chatBubbles.filter(b => b.playerId === rightPlayer.player.id).slice(-1).map(b => (
+              <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
+            ))}
+
             {isPlaying && gameState.currentPlayer === rightPlayer.index && turnTimer && (
               <CountdownTimer durationMs={turnTimer.durationMs} startTime={turnTimer.startTime} />
             )}
-            <div className={`w-12 h-12 rounded-full bg-slate-700 border-2 flex items-center justify-center mb-1 shadow-lg ${rightPlayer.player.isTrusteeship ? 'border-yellow-500' : 'border-slate-600'}`}>
-              {rightPlayer.player.name[0]}
+            
+            <Character 
+              name={rightPlayer.player.name}
+              isMe={false}
+              isTurn={!!(isPlaying && gameState.currentPlayer === rightPlayer.index)}
+              cardCount={isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 0}
+              onClick={() => setInteractionMenuTarget(rightPlayer.player.id)}
+            />
+
+            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              💰 {rightPlayer.player.score}
             </div>
-            <div className="text-white text-sm bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
-              {rightPlayer.player.name}
-              {rightPlayer.player.isTrusteeship && <Bot size={12} className="text-yellow-400" />}
-            </div>
-            <div className="text-xs text-yellow-400 mt-0.5">💰 {rightPlayer.player.score}</div>
-            <div className="mt-2 flex flex-col -space-y-6">
-              {Array.from({ length: Math.min(5, isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 5) }).map((_, i) => (
-                <div key={i} className="w-8 h-6 bg-blue-600 rounded border border-white/20 shadow-sm" />
-              ))}
-            </div>
+
+            {rightPlayer.player.isTrusteeship && (
+              <div className="absolute -left-8 top-0 bg-yellow-600 text-white text-xs px-1 rounded animate-pulse">
+                <Bot size={12} />
+              </div>
+            )}
           </div>
         )}
 
         {/* My Hand (Bottom) */}
-        <div className="absolute bottom-0 left-0 right-0 pb-4 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent flex flex-col items-center z-20">
+        <div 
+          ref={el => { if (el && gameSocket.id) playerRefs.current[gameSocket.id] = el }}
+          className="absolute bottom-0 left-0 right-0 pb-4 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent flex flex-col items-center z-20"
+        >
           
+          {/* My Character (Small, for interaction target) */}
+          <div className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity">
+             <Character 
+               name="我"
+               isMe={true}
+               isTurn={!!isMyTurn}
+               cardCount={0} 
+             />
+             {/* My Chat Bubble */}
+             {gameSocket.id && chatBubbles.filter(b => b.playerId === gameSocket.id).slice(-1).map(b => (
+                <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
+             ))}
+          </div>
+
           {/* Multiplier */}
           {isPlaying && (
              <div className="absolute bottom-8 right-8 text-red-500 font-black text-4xl drop-shadow-lg animate-pulse z-30 pointer-events-none select-none" style={{ textShadow: '0 0 10px rgba(255,0,0,0.5)' }}>
@@ -467,6 +592,42 @@ export default function Room() {
 
       {/* Chat Panel */}
       <ChatPanel />
+
+      {/* Interaction Layer */}
+      <InteractionLayer 
+        events={interactions} 
+        onComplete={(id) => setInteractions(prev => prev.filter(i => i.id !== id))} 
+      />
+
+      {/* Game Over Modal */}
+      {gameOverData && room && gameSocket.id && (
+        <GameOverModal 
+          results={gameOverData} 
+          players={room.players} 
+          myId={gameSocket.id} 
+          onClose={() => setGameOverData(null)} 
+        />
+      )}
+
+      {/* Interaction Menu */}
+      {interactionMenuTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setInteractionMenuTarget(null)}>
+          <div className="bg-slate-800 p-4 rounded-xl border border-slate-600 shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="text-white font-bold mb-4 text-center">选择互动道具</div>
+            <div className="grid grid-cols-3 gap-4">
+              {['tomato', 'bomb', 'flower', 'kiss', 'egg'].map(item => (
+                <button 
+                  key={item}
+                  onClick={() => sendInteraction(item)}
+                  className="text-4xl p-4 bg-slate-700 hover:bg-slate-600 rounded-lg transition-transform hover:scale-110 active:scale-95"
+                >
+                  {{ tomato: '🍅', bomb: '💣', flower: '🌹', kiss: '💋', egg: '🥚' }[item]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
