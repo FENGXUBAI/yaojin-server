@@ -5,13 +5,12 @@ import { useUserStore } from '@/store/userStore'
 import { gameSocket } from '@/services/socket'
 import toast from 'react-hot-toast'
 import Card from '@/components/Card'
-import ChatPanel from '@/components/ChatPanel'
 import VFXOverlay from '@/components/VFXOverlay'
 import Character from '@/components/Character'
 import ChatBubble from '@/components/ChatBubble'
 import GameOverModal from '@/components/GameOverModal'
 import InteractionLayer, { InteractionEvent } from '@/components/InteractionLayer'
-import { Bot, Clock } from 'lucide-react'
+import { Bot, Clock, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
@@ -38,6 +37,12 @@ function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTi
   )
 }
 
+// Pseudo-random helper for stable scattering
+const getStableRandom = (seed: number) => {
+  const x = Math.sin(seed * 9999) * 10000
+  return x - Math.floor(x)
+}
+
 export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
@@ -52,6 +57,7 @@ export default function Room() {
   const [interactions, setInteractions] = useState<InteractionEvent[]>([])
   const [chatBubbles, setChatBubbles] = useState<{ playerId: string, message: string, isEmoji: boolean, id: number }[]>([])
   const [interactionMenuTarget, setInteractionMenuTarget] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{x: number, y: number} | null>(null)
   
   // Refs for positioning
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -77,14 +83,12 @@ export default function Room() {
           startRect,
           endRect
         }])
+      } else {
+        console.warn('Interaction missing refs:', { senderId: data.senderId, targetId: data.targetId, refs: Object.keys(playerRefs.current) })
       }
     }
 
     const onChatMessage = (data: { player: string, message: string, isEmoji: boolean }) => {
-      // Find player ID by name (since chat event sends name currently, ideally should send ID)
-      // But wait, the chat event in index.ts sends { player: name, ... }
-      // I should probably update server to send ID, or find player by name here.
-      // Let's find by name for now.
       const player = room?.players.find(p => p.name === data.player)
       if (player) {
         setChatBubbles(prev => [...prev, { 
@@ -111,7 +115,22 @@ export default function Room() {
     if (interactionMenuTarget && room) {
       gameSocket.emit('interaction', { room: room.id, targetId: interactionMenuTarget, type })
       setInteractionMenuTarget(null)
+      setMenuPosition(null)
     }
+  }
+
+  const handleCharacterClick = (playerId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Don't show menu for self if desired, but usually allowed
+    if (playerId === gameSocket.id) return 
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    // Position menu to the right of the character by default, or left if too close to edge
+    const x = rect.right + 10 > window.innerWidth - 200 ? rect.left - 210 : rect.right + 10
+    const y = rect.top
+    
+    setInteractionMenuTarget(playerId)
+    setMenuPosition({ x, y })
   }
 
   useEffect(() => {
@@ -244,7 +263,10 @@ export default function Room() {
   const leftPlayer = room.playerCount === 4 ? getPlayerAtOffset(3) : getPlayerAtOffset(2)
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-slate-900 flex flex-col overflow-hidden" onClick={() => {
+      setInteractionMenuTarget(null)
+      setMenuPosition(null)
+    }}>
       {/* Top Bar */}
       <div className="h-14 bg-slate-800/80 backdrop-blur border-b border-slate-700 flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-4">
@@ -297,34 +319,32 @@ export default function Room() {
               )}
             </div>
           ) : (
-            <div className="relative w-full h-full max-w-4xl max-h-[600px]">
-              {/* Table Plays (Accumulated) */}
+            <div className="relative w-full h-full">
+              {/* Table Plays (Scattered) */}
               {gameState.tablePlays?.map((play, idx) => {
-                const playerIndex = play.by
-                // Calculate relative position
-                let posClass = ''
-                let offsetStyle = { transform: `translate(${idx * 2}px, ${idx * 2}px)` } // Stack effect
+                // Generate stable random position
+                const seed = idx * 1337 + play.by
+                const randX = getStableRandom(seed)
+                const randY = getStableRandom(seed + 1)
+                const randRot = getStableRandom(seed + 2)
+                
+                // Scatter range: +/- 150px X, +/- 80px Y
+                const x = (randX - 0.5) * 300
+                const y = (randY - 0.5) * 160
+                const rot = (randRot - 0.5) * 60 // +/- 30 deg
 
-                if (playerIndex === myIndex) {
-                   posClass = 'left-1/2 top-[60%] -translate-x-1/2' // My play
-                } else if (rightPlayer && playerIndex === rightPlayer.index) {
-                   posClass = 'right-[20%] top-1/2 -translate-y-1/2' // Right play
-                } else if (topPlayer && playerIndex === topPlayer.index) {
-                   posClass = 'left-1/2 top-[30%] -translate-x-1/2' // Top play
-                } else if (leftPlayer && playerIndex === leftPlayer.index) {
-                   posClass = 'left-[20%] top-1/2 -translate-y-1/2' // Left play
-                }
-                
-                // Only show the last few plays per player to avoid clutter, or stack them?
-                // User wants "all played cards kept". We can stack them.
-                // To avoid total chaos, we might want to group them by trick or just pile them.
-                // Let's just render them all but with z-index increasing.
-                
                 return (
-                  <div key={`${playerIndex}-${idx}`} className={`absolute ${posClass} flex flex-col items-center transition-all duration-300`} style={{ zIndex: idx, ...offsetStyle }}>
+                  <div 
+                    key={`${play.by}-${idx}`} 
+                    className="absolute left-1/2 top-1/2 flex flex-col items-center transition-all duration-500" 
+                    style={{ 
+                      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${rot}deg)`,
+                      zIndex: idx 
+                    }}
+                  >
                      <div className="flex -space-x-8">
                        {play.cards.map((c, i) => (
-                         <Card key={i} card={c} scale={0.6} /> 
+                         <Card key={i} card={c} scale={0.6} hideBottomInfo={true} /> 
                        ))}
                      </div>
                   </div>
@@ -342,7 +362,7 @@ export default function Room() {
         {topPlayer && (
           <div 
             ref={el => { if (el) playerRefs.current[topPlayer.player.id] = el }}
-            className="absolute top-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-30"
+            className="absolute top-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-30 pointer-events-auto"
           >
             {/* Chat Bubble */}
             {chatBubbles.filter(b => b.playerId === topPlayer.player.id).slice(-1).map(b => (
@@ -358,7 +378,7 @@ export default function Room() {
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === topPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 0}
-              onClick={() => setInteractionMenuTarget(topPlayer.player.id)}
+              onClick={(e) => handleCharacterClick(topPlayer.player.id, e)}
             />
 
             <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
@@ -377,7 +397,7 @@ export default function Room() {
         {leftPlayer && (
           <div 
             ref={el => { if (el) playerRefs.current[leftPlayer.player.id] = el }}
-            className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30"
+            className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30 pointer-events-auto"
           >
             {/* Chat Bubble */}
             {chatBubbles.filter(b => b.playerId === leftPlayer.player.id).slice(-1).map(b => (
@@ -393,7 +413,7 @@ export default function Room() {
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === leftPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 0}
-              onClick={() => setInteractionMenuTarget(leftPlayer.player.id)}
+              onClick={(e) => handleCharacterClick(leftPlayer.player.id, e)}
             />
 
             <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
@@ -412,7 +432,7 @@ export default function Room() {
         {rightPlayer && (
           <div 
             ref={el => { if (el) playerRefs.current[rightPlayer.player.id] = el }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30"
+            className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center z-30 pointer-events-auto"
           >
             {/* Chat Bubble */}
             {chatBubbles.filter(b => b.playerId === rightPlayer.player.id).slice(-1).map(b => (
@@ -428,7 +448,7 @@ export default function Room() {
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === rightPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 0}
-              onClick={() => setInteractionMenuTarget(rightPlayer.player.id)}
+              onClick={(e) => handleCharacterClick(rightPlayer.player.id, e)}
             />
 
             <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
@@ -445,17 +465,20 @@ export default function Room() {
 
         {/* My Hand (Bottom) */}
         <div 
-          ref={el => { if (el && gameSocket.id) playerRefs.current[gameSocket.id] = el }}
           className="absolute bottom-0 left-0 right-0 pb-4 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent flex flex-col items-center z-20"
         >
           
           {/* My Character (Small, for interaction target) */}
-          <div className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity">
+          <div 
+            ref={el => { if (el && gameSocket.id) playerRefs.current[gameSocket.id] = el }}
+            className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto"
+          >
              <Character 
                name="我"
                isMe={true}
                isTurn={!!isMyTurn}
                cardCount={0} 
+               onClick={(e) => gameSocket.id && handleCharacterClick(gameSocket.id, e)}
              />
              {/* My Chat Bubble */}
              {gameSocket.id && chatBubbles.filter(b => b.playerId === gameSocket.id).slice(-1).map(b => (
@@ -560,7 +583,7 @@ export default function Room() {
           )}
 
           {/* Hand Cards */}
-          <div className="flex -space-x-8 hover:-space-x-4 transition-all duration-300 px-4 overflow-x-auto max-w-full pb-4 pt-4 min-h-[160px] items-end">
+          <div className="flex -space-x-8 hover:-space-x-4 transition-all duration-300 px-4 overflow-x-auto max-w-full pb-4 pt-4 min-h-[160px] items-end pointer-events-auto">
             {myHand.map((card, idx) => (
               <motion.div 
                 key={`${card.rank}-${card.suit}-${idx}`} 
@@ -590,9 +613,6 @@ export default function Room() {
         </div>
       </div>
 
-      {/* Chat Panel */}
-      <ChatPanel />
-
       {/* Interaction Layer */}
       <InteractionLayer 
         events={interactions} 
@@ -609,17 +629,25 @@ export default function Room() {
         />
       )}
 
-      {/* Interaction Menu */}
-      {interactionMenuTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setInteractionMenuTarget(null)}>
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-600 shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-            <div className="text-white font-bold mb-4 text-center">选择互动道具</div>
-            <div className="grid grid-cols-3 gap-4">
+      {/* Interaction Menu (Absolute Positioned) */}
+      {interactionMenuTarget && menuPosition && (
+        <div 
+          className="fixed z-[60] animate-in fade-in zoom-in duration-200"
+          style={{ left: menuPosition.x, top: menuPosition.y }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="bg-slate-800/90 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-2xl flex flex-col gap-2">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-1">
+               <span className="text-xs font-bold text-slate-300">互动</span>
+               <button onClick={() => setInteractionMenuTarget(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
               {['tomato', 'bomb', 'flower', 'kiss', 'egg'].map(item => (
                 <button 
                   key={item}
                   onClick={() => sendInteraction(item)}
-                  className="text-4xl p-4 bg-slate-700 hover:bg-slate-600 rounded-lg transition-transform hover:scale-110 active:scale-95"
+                  className="text-2xl p-2 bg-slate-700/50 hover:bg-slate-600 rounded-lg transition-transform hover:scale-110 active:scale-95"
+                  title={item}
                 >
                   {{ tomato: '🍅', bomb: '💣', flower: '🌹', kiss: '💋', egg: '🥚' }[item]}
                 </button>

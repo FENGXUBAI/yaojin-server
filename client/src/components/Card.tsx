@@ -8,6 +8,7 @@ interface CardProps {
   onClick?: () => void
   scale?: number
   hidden?: boolean
+  hideBottomInfo?: boolean
 }
 
 const suitColors: Record<string, string> = {
@@ -17,7 +18,7 @@ const suitColors: Record<string, string> = {
   '♦': 'text-red-600',
 }
 
-export default function Card({ card, selected, onClick, scale = 1, hidden }: CardProps) {
+export default function Card({ card, selected, onClick, scale = 1, hidden, hideBottomInfo }: CardProps) {
   if (hidden) {
     return (
       <div 
@@ -66,7 +67,7 @@ export default function Card({ card, selected, onClick, scale = 1, hidden }: Car
       </div>
 
       {/* Bottom Right (Rotated) */}
-      {!isJoker && (
+      {!isJoker && !hideBottomInfo && (
         <div className="self-end flex flex-col items-center leading-none rotate-180">
           <span className="font-bold text-lg">{displayRank}</span>
           <span className="text-lg">{card.suit}</span>
