@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, type MouseEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '@/store/gameStore'
 import { useUserStore } from '@/store/userStore'
@@ -119,7 +119,7 @@ export default function Room() {
     }
   }
 
-  const handleCharacterClick = (playerId: string, e: React.MouseEvent) => {
+  const handleCharacterClick = (playerId: string, e: MouseEvent<HTMLDivElement>) => {
     e.stopPropagation()
     // Don't show menu for self if desired, but usually allowed
     if (playerId === gameSocket.id) return 

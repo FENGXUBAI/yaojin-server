@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
+import type { MouseEvent } from 'react'
 
 interface CharacterProps {
   name: string
   isMe: boolean
   isTurn: boolean
   cardCount: number
-  onClick?: () => void
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void
 }
 
 export default function Character({ name, isMe, isTurn, cardCount, onClick }: CharacterProps) {
