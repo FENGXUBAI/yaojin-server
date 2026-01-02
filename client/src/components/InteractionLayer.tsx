@@ -43,16 +43,25 @@ function Projectile({ event, onComplete }: { event: InteractionEvent, onComplete
     <motion.div
       initial={{ x: startX, y: startY, scale: 0.5, opacity: 1, rotate: 0 }}
       animate={{ 
-        x: endX, 
-        y: endY, 
-        scale: [1, 1.5, 1], 
-        rotate: 720 
+        x: [startX, endX], 
+        y: [startY, endY], 
+        scale: [0.5, 1.5, 1], 
+        rotate: [0, 720] 
       }}
-      transition={{ duration: 0.8, ease: "easeInOut" }}
-      onAnimationComplete={onComplete}
-      className="absolute text-4xl drop-shadow-lg"
+      transition={{ duration: 0.6, ease: "easeIn" }}
+      onAnimationComplete={() => {
+        // Trigger impact effect (handled by parent or just visual here?)
+        // For now, let's just do a quick "splat" animation before completing
+      }}
+      className="absolute text-4xl drop-shadow-lg z-[200]"
     >
-      {emoji}
+      <motion.div
+        animate={{ scale: [1, 2, 0], opacity: [1, 1, 0] }}
+        transition={{ delay: 0.6, duration: 0.3 }}
+        onAnimationComplete={onComplete}
+      >
+        {emoji}
+      </motion.div>
     </motion.div>
   )
 }

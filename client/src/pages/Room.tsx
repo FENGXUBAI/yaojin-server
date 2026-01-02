@@ -10,6 +10,7 @@ import Character from '@/components/Character'
 import ChatBubble from '@/components/ChatBubble'
 import GameOverModal from '@/components/GameOverModal'
 import InteractionLayer, { InteractionEvent } from '@/components/InteractionLayer'
+import QuickChat from '@/components/QuickChat'
 import { Bot, Clock, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -471,7 +472,7 @@ export default function Room() {
           {/* My Character (Small, for interaction target) */}
           <div 
             ref={el => { if (el && gameSocket.id) playerRefs.current[gameSocket.id] = el }}
-            className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto"
+            className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto flex flex-col items-center gap-2"
           >
              <Character 
                name="我"
@@ -480,6 +481,16 @@ export default function Room() {
                cardCount={0} 
                onClick={(e) => gameSocket.id && handleCharacterClick(gameSocket.id, e)}
              />
+             
+             {/* Quick Chat Button */}
+             <QuickChat onSend={(msg, isEmoji) => {
+               if (room) {
+                 // Send chat via socket (assuming 'chat' event exists or similar)
+                 // The store has sendChat method
+                 useGameStore.getState().sendChat(msg, isEmoji)
+               }
+             }} />
+
              {/* My Chat Bubble */}
              {gameSocket.id && chatBubbles.filter(b => b.playerId === gameSocket.id).slice(-1).map(b => (
                 <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
