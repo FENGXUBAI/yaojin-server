@@ -42,7 +42,7 @@ export default function QuickChat({ onSend }: QuickChatProps) {
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="absolute bottom-14 left-0 w-64 bg-slate-800/95 backdrop-blur border border-slate-600 rounded-xl shadow-2xl p-3 z-50 flex flex-col gap-3"
+            className="absolute bottom-14 right-0 w-64 bg-slate-800/95 backdrop-blur border border-slate-600 rounded-xl shadow-2xl p-3 z-50 flex flex-col gap-3"
           >
             {/* Emojis */}
             <div className="grid grid-cols-5 gap-2">

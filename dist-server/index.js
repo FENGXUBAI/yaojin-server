@@ -1084,6 +1084,23 @@ io.on('connection', (socket) => {
             timestamp: Date.now()
         });
     });
+    // 互动表情处理
+    socket.on('interaction', ({ room, targetId, type }) => {
+        if (isRateLimited(socket.id, 500))
+            return;
+        const r = rooms.get(room);
+        if (!r)
+            return;
+        const player = r.players.find(p => p.id === socket.id);
+        if (!player)
+            return;
+        // 广播互动事件
+        io.to(room).emit('interaction', {
+            senderId: socket.id,
+            targetId,
+            type
+        });
+    });
     // 用户主动开关托管
     socket.on('setTrusteeship', ({ room, enabled }) => {
         if (isRateLimited(socket.id, 200))
