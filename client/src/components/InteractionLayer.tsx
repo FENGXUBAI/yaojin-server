@@ -129,14 +129,6 @@ function Projectile({ event, onComplete }: { event: InteractionEvent, onComplete
               </motion.div>
             )
           })}
-
-          {/* Screen shake effect (CSS) */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.3, 0] }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-white pointer-events-none z-[198]"
-          />
         </>
       )}
     </>

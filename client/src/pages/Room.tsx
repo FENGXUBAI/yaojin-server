@@ -31,8 +31,8 @@ function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTi
   if (timeLeft <= 0) return null
 
   return (
-    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 shadow-lg border border-slate-600 z-20">
-      <Clock size={14} className="text-yellow-400" />
+    <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-6 py-2 rounded-full text-2xl font-bold flex items-center gap-2 shadow-lg border border-slate-600 z-20 min-w-[120px] justify-center">
+      <Clock size={24} className="text-yellow-400" />
       <span className={timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-white'}>{timeLeft}s</span>
     </div>
   )
@@ -59,6 +59,7 @@ export default function Room() {
   const [chatBubbles, setChatBubbles] = useState<{ playerId: string, message: string, isEmoji: boolean, id: number }[]>([])
   const [interactionMenuTarget, setInteractionMenuTarget] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{x: number, y: number} | null>(null)
+  const [isX10, setIsX10] = useState(false)
   
   // Refs for positioning
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -114,9 +115,19 @@ export default function Room() {
 
   const sendInteraction = (type: string) => {
     if (interactionMenuTarget && room) {
-      gameSocket.emit('interaction', { room: room.id, targetId: interactionMenuTarget, type })
+      const count = isX10 ? 10 : 1
+      const target = interactionMenuTarget
+      
+      // Send multiple times with delay to avoid rate limit and create visual stream
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+          gameSocket.emit('interaction', { room: room.id, targetId: target, type })
+        }, i * 200)
+      }
+      
       setInteractionMenuTarget(null)
       setMenuPosition(null)
+      setIsX10(false) // Reset after sending
     }
   }
 
@@ -650,7 +661,15 @@ export default function Room() {
           <div className="bg-slate-800/90 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-2xl flex flex-col gap-2">
             <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-1">
                <span className="text-xs font-bold text-slate-300">互动</span>
-               <button onClick={() => setInteractionMenuTarget(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
+               <div className="flex items-center gap-2">
+                 <button 
+                   onClick={() => setIsX10(!isX10)}
+                   className={`text-xs px-2 py-0.5 rounded border ${isX10 ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}
+                 >
+                   x10连击
+                 </button>
+                 <button onClick={() => setInteractionMenuTarget(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
+               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {['tomato', 'bomb', 'flower', 'kiss', 'egg'].map(item => (
