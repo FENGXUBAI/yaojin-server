@@ -44,33 +44,36 @@ export default function Card({ card, selected, onClick, scale = 1, hidden, hideB
       animate={{ y: selected ? -20 : 0 }}
       onClick={onClick}
       className={clsx(
-        "relative bg-white rounded-lg shadow-md select-none cursor-pointer border border-slate-200 flex flex-col items-center justify-between p-1 transition-shadow hover:shadow-lg",
+        "relative bg-white rounded-lg shadow-md select-none cursor-pointer border border-slate-200 flex flex-col items-center justify-between transition-shadow hover:shadow-lg",
         colorClass
       )}
-      style={{ width: 80 * scale, height: 112 * scale }}
+      style={{ width: 80 * scale, height: 112 * scale, padding: `${0.25 * scale}rem` }}
     >
       {/* Top Left */}
       <div className="self-start flex flex-col items-center leading-none">
-        <span className={clsx("font-bold", isJoker ? "text-sm writing-vertical-rl mt-1" : "text-lg")}>
+        <span 
+          className={clsx("font-bold", isJoker && "writing-vertical-rl")}
+          style={{ fontSize: isJoker ? `${0.75 * scale}rem` : `${1.125 * scale}rem`, marginTop: isJoker ? `${0.25 * scale}rem` : 0 }}
+        >
           {displayRank}
         </span>
-        {!isJoker && <span className="text-lg">{card.suit}</span>}
+        {!isJoker && <span style={{ fontSize: `${1.125 * scale}rem` }}>{card.suit}</span>}
       </div>
 
       {/* Center (Suit or Joker) */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         {isJoker ? (
-          <span className="text-4xl writing-vertical-rl">{card.rank === 'JOKER_BIG' ? '👹' : '🤡'}</span>
+          <span style={{ fontSize: `${2.25 * scale}rem` }} className="writing-vertical-rl">{card.rank === 'JOKER_BIG' ? '👹' : '🤡'}</span>
         ) : (
-          <span className="text-4xl">{card.suit}</span>
+          <span style={{ fontSize: `${2.25 * scale}rem` }}>{card.suit}</span>
         )}
       </div>
 
       {/* Bottom Right (Rotated) */}
       {!isJoker && !hideBottomInfo && (
         <div className="self-end flex flex-col items-center leading-none rotate-180">
-          <span className="font-bold text-lg">{displayRank}</span>
-          <span className="text-lg">{card.suit}</span>
+          <span className="font-bold" style={{ fontSize: `${1.125 * scale}rem` }}>{displayRank}</span>
+          <span style={{ fontSize: `${1.125 * scale}rem` }}>{card.suit}</span>
         </div>
       )}
     </motion.div>
