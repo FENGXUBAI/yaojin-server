@@ -12,23 +12,31 @@ const BASE = '/assets/sounds'
 const MAP: Record<string, string> = {
   pass: 'sfx_pass.wav',
   qi: 'sfx_qi.wav',
-  bomb: 'sfx_bomb.wav',
-  king_bomb: 'sfx_king_bomb.wav',
+  bomb: 'common/bomb.mp3',
+  king_bomb: 'common/rocket.mp3',
   play_single: 'sfx_play_single.wav',
   play_pair: 'sfx_play_pair.wav',
   play_triple: 'sfx_play_triple.wav',
-  play_straight: 'sfx_play_straight.wav',
-  play_double_sequence: 'sfx_play_double_sequence.wav',
+  play_straight: 'common/shunzi.mp3',
+  play_double_sequence: 'common/continuous_pair.mp3',
   play_unknown: 'sfx_play_single.wav',
+  // Common sounds
+  deal: 'common/fapai.mp3',
+  select: 'common/click_cards.mp3',
+  button_click: 'common/audio_button_click.mp3',
+  win: 'common/Victory.mp3',
+  lose: 'common/Failure.mp3',
+  coins: 'common/coins_fly.mp3',
+  multiply: 'common/beishu.mp3',
 }
 
-// Voice files mapping (from DouDZ)
-// dan1-dan15: single card voices (3=1, 4=2, ..., K=11, A=12, 2=13, 小王=14, 大王=15)
-// dui1-dui13: pair voices (3=1, ..., 2=13)
-// tuple1-tuple13: triple/bomb voices (3=1, ..., 2=13)
+// Voice files mapping (corrected)
+// dan1-dan15: A=1, 2=2, 3=3, 4=4, 5=5, 6=6, 7=7, 8=8, 9=9, 10=10, J=11, Q=12, K=13, 小王=14, 大王=15
+// dui1-dui13: A=1, 2=2, 3=3, ..., K=13
+// tuple1-tuple13: A=1, 2=2, 3=3, ..., K=13
 const RANK_TO_INDEX: Record<string, number> = {
-  '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, '10': 8,
-  'J': 9, 'Q': 10, 'K': 11, 'A': 12, '2': 13,
+  'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+  'J': 11, 'Q': 12, 'K': 13,
   'JOKER_SMALL': 14, 'JOKER_BIG': 15
 }
 
@@ -165,14 +173,20 @@ export function playSfx(evt: SfxEvt) {
 }
 
 // Play special effect sound (for bomb VFX etc)
-export function playSpecialSfx(type: 'bomb' | 'wangzha' | 'flower' | 'multiply' | 'plane' | 'star') {
+export function playSpecialSfx(type: 'bomb' | 'wangzha' | 'flower' | 'multiply' | 'plane' | 'star' | 'deal' | 'select' | 'win' | 'lose' | 'coins' | 'button') {
   const files: Record<string, string> = {
-    bomb: 'voice/special_bomb.ogg',
-    wangzha: 'voice/special_bomb_wangzha.ogg',
+    bomb: 'common/bomb.mp3',
+    wangzha: 'common/rocket.mp3',
     flower: 'voice/special_flower.ogg',
-    multiply: 'voice/special_multiply.ogg',
-    plane: 'voice/special_plane.ogg',
-    star: 'voice/special_star.ogg'
+    multiply: 'common/beishu.mp3',
+    plane: 'common/airplane_the_first_time.mp3',
+    star: 'voice/special_star.ogg',
+    deal: 'common/fapai.mp3',
+    select: 'common/click_cards.mp3',
+    win: 'common/Victory.mp3',
+    lose: 'common/Failure.mp3',
+    coins: 'common/coins_fly.mp3',
+    button: 'common/audio_button_click.mp3'
   }
   
   const file = files[type]
