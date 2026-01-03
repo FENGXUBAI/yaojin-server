@@ -481,20 +481,20 @@ export default function Room() {
                cardCount={0} 
                onClick={(e) => gameSocket.id && handleCharacterClick(gameSocket.id, e)}
              />
-             
-             {/* Quick Chat Button */}
-             <QuickChat onSend={(msg, isEmoji) => {
-               if (room) {
-                 // Send chat via socket (assuming 'chat' event exists or similar)
-                 // The store has sendChat method
-                 useGameStore.getState().sendChat(msg, isEmoji)
-               }
-             }} />
 
              {/* My Chat Bubble */}
              {gameSocket.id && chatBubbles.filter(b => b.playerId === gameSocket.id).slice(-1).map(b => (
                 <ChatBubble key={b.id} message={b.message} isEmoji={b.isEmoji} />
              ))}
+          </div>
+
+          {/* Quick Chat Button - Right Side */}
+          <div className="absolute bottom-20 right-8 pointer-events-auto z-40">
+             <QuickChat onSend={(msg, isEmoji) => {
+               if (room) {
+                 useGameStore.getState().sendChat(msg, isEmoji)
+               }
+             }} />
           </div>
 
           {/* Multiplier */}

@@ -54,7 +54,7 @@ app.post('/api/auth/guest', (req, res) => {
             id: userId,
             nickname: finalNickname,
             avatarUrl: '',
-            coins: 10000,
+            coins: 50000,
             level: 1
         };
         users.set(userId, user);
@@ -88,7 +88,7 @@ app.post('/api/auth/wechat', (req, res) => {
                 id: userId,
                 nickname: nickname || `微信用户${Math.floor(Math.random() * 1000)}`,
                 avatarUrl: avatarUrl || '',
-                coins: 10000,
+                coins: 50000,
                 level: 1
             };
             users.set(userId, user);
@@ -420,7 +420,7 @@ function emitMvp(r, evt) {
     io.to(r.id).emit('mvpEvent', payload);
 }
 function executeBotTurn(room) {
-    var _a;
+    var _a, _b, _c;
     if (!room.gameState || room.gameState.status !== 'playing')
         return;
     const state = room.gameState;
@@ -436,12 +436,27 @@ function executeBotTurn(room) {
         const nextState = (0, game_1.playTurn)(state, action);
         room.gameState = nextState;
         io.to(room.id).emit('gameState', publicizeGameState(nextState));
+        // IMPORTANT: Also emit private state so trusteeship player sees hand update
+        emitPrivateState(room);
         if (action.type === 'play') {
             const p = (0, patterns_1.detectPattern)(action.cards);
             if (p) {
-                emitSfx(room, { kind: 'play', by: currentPlayerIdx, pattern: p });
+                // Get representative card rank for voice selection
+                const cards = (_a = action.cards) !== null && _a !== void 0 ? _a : [];
+                const representativeCard = cards.find(c => !c.isJoker) || cards[0];
+                const cardRank = (representativeCard === null || representativeCard === void 0 ? void 0 : representativeCard.isJoker)
+                    ? (representativeCard.rank === 'JOKER_BIG' ? 'JOKER_BIG' : 'JOKER_SMALL')
+                    : representativeCard === null || representativeCard === void 0 ? void 0 : representativeCard.rank;
+                emitSfx(room, {
+                    kind: 'play',
+                    by: currentPlayerIdx,
+                    patternType: p.type,
+                    isKingBomb: !!((_b = p.extra) === null || _b === void 0 ? void 0 : _b.isKingBomb),
+                    count: cards.length,
+                    cardRank,
+                });
                 // Bot Chat: React to big plays
-                if (p.type === 'FOUR' || (p.type === 'PAIR' && ((_a = p.extra) === null || _a === void 0 ? void 0 : _a.isKingBomb))) {
+                if (p.type === 'FOUR' || (p.type === 'PAIR' && ((_c = p.extra) === null || _c === void 0 ? void 0 : _c.isKingBomb))) {
                     setTimeout(() => {
                         const bots = room.players.filter(pl => pl.isBot);
                         if (bots.length > 0) {
@@ -964,6 +979,11 @@ io.on('connection', (socket) => {
                 if (pat) {
                     const hasJoker = cards.some(c => c.isJoker);
                     const hasA2 = cards.some(c => c.rank === 'A' || c.rank === '2');
+                    // Get representative card rank for voice selection
+                    const representativeCard = cards.find(c => !c.isJoker) || cards[0];
+                    const cardRank = (representativeCard === null || representativeCard === void 0 ? void 0 : representativeCard.isJoker)
+                        ? (representativeCard.rank === 'JOKER_BIG' ? 'JOKER_BIG' : 'JOKER_SMALL')
+                        : representativeCard === null || representativeCard === void 0 ? void 0 : representativeCard.rank;
                     emitSfx(r, {
                         kind: 'play',
                         by: pIdx,
@@ -972,6 +992,7 @@ io.on('connection', (socket) => {
                         count: cards.length,
                         hasJoker,
                         hasA2,
+                        cardRank,
                     });
                 }
                 else {
@@ -999,7 +1020,7 @@ io.on('connection', (socket) => {
                 if (r.turnTimer)
                     clearTimeout(r.turnTimer);
                 // Calculate Scores
-                const baseScore = 1000;
+                const baseScore = 100;
                 const multiplier = nextState.multiplier;
                 const totalStake = baseScore * multiplier;
                 const finished = nextState.finishedOrder;
@@ -1164,6 +1185,23 @@ io.on('connection', (socket) => {
             player: player.name,
             message: message,
             isEmoji: isEmoji || false
+        });
+    });
+    // 互动表情/道具
+    socket.on('interaction', ({ room, targetId, type }) => {
+        if (isRateLimited(socket.id, 500))
+            return;
+        const r = rooms.get(room);
+        if (!r)
+            return;
+        const sender = r.players.find(p => p.id === socket.id);
+        const target = r.players.find(p => p.id === targetId);
+        if (!sender || !target)
+            return;
+        io.to(room).emit('interaction', {
+            senderId: sender.id,
+            targetId: target.id,
+            type
         });
     });
 });
