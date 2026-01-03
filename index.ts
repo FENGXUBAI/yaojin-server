@@ -13,6 +13,10 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -62,7 +66,7 @@ app.post('/api/auth/guest', (req, res) => {
       id: userId,
       nickname: finalNickname,
       avatarUrl: '',
-      coins: 10000,
+      coins: 50000,
       level: 1
     };
     
@@ -101,7 +105,7 @@ app.post('/api/auth/wechat', (req, res) => {
         id: userId,
         nickname: nickname || `微信用户${Math.floor(Math.random() * 1000)}`,
         avatarUrl: avatarUrl || '',
-        coins: 10000,
+        coins: 50000,
         level: 1
       };
       users.set(userId, user);
@@ -477,11 +481,25 @@ function executeBotTurn(room: Room) {
     room.gameState = nextState;
     
     io.to(room.id).emit('gameState', publicizeGameState(nextState));
+    // Keep trusteeship player's hand in sync
+    emitPrivateState(room);
     
     if (action.type === 'play') {
       const p = detectPattern(action.cards);
       if (p) {
-        emitSfx(room, { kind: 'play', by: currentPlayerIdx, pattern: p });
+        const cards = action.cards ?? [];
+        const representativeCard = cards.find(c => !c.isJoker) || cards[0];
+        const cardRank = representativeCard?.isJoker
+          ? (representativeCard.rank === 'JOKER_BIG' ? 'JOKER_BIG' : 'JOKER_SMALL')
+          : representativeCard?.rank;
+        emitSfx(room, {
+          kind: 'play',
+          by: currentPlayerIdx,
+          patternType: p.type,
+          isKingBomb: !!p.extra?.isKingBomb,
+          count: cards.length,
+          cardRank,
+        });
         
         // Bot Chat: React to big plays
         if (p.type === 'FOUR' || (p.type === 'PAIR' && p.extra?.isKingBomb)) {
@@ -967,6 +985,10 @@ io.on('connection', (socket: Socket) => {
         if (pat) {
           const hasJoker = cards.some(c => c.isJoker);
           const hasA2 = cards.some(c => c.rank === 'A' || c.rank === '2');
+          const representativeCard = cards.find(c => !c.isJoker) || cards[0];
+          const cardRank = representativeCard?.isJoker
+            ? (representativeCard.rank === 'JOKER_BIG' ? 'JOKER_BIG' : 'JOKER_SMALL')
+            : representativeCard?.rank;
           emitSfx(r, {
             kind: 'play',
             by: pIdx,
@@ -975,6 +997,7 @@ io.on('connection', (socket: Socket) => {
             count: cards.length,
             hasJoker,
             hasA2,
+            cardRank,
           });
         } else {
           const all4 = cards.length > 0 && cards.every(c => !c.isJoker && c.rank === '4');
