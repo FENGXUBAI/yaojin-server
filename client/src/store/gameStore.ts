@@ -3,7 +3,7 @@ import { gameSocket } from '@/services/socket'
 import { Room, GameState, RoomStatePayload, Card, ChatMessage, TurnTimerPayload } from '@/types'
 import { useUserStore } from './userStore'
 import toast from 'react-hot-toast'
-import { playSfx } from '@/services/sfx'
+import { playSfx, playSpecialSfx } from '@/services/sfx'
 
 let listenersBound = false
 
@@ -104,9 +104,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       gameSocket.on('chatMessage', (msg: ChatMessage) => {
         try {
-          const audio = new Audio('/assets/sounds/select.mp3')
-          audio.volume = 0.5
-          void audio.play()
+          playSpecialSfx('select')
         } catch (e) {
           console.error('Failed to play chat sound', e)
         }

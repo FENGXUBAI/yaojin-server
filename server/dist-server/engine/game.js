@@ -338,11 +338,15 @@ function playTurn(state, action) {
     }
     // Update Multiplier
     let newMultiplier = state.multiplier;
-    if (pattern.type === 'FOUR') {
-        newMultiplier *= 2; // Bomb x2
+    // 规则：炸(TRIPLE)=x20，轰(FOUR)=x40，王炸=x40
+    if (pattern.type === 'TRIPLE') {
+        newMultiplier *= 20;
+    }
+    else if (pattern.type === 'FOUR') {
+        newMultiplier *= 40;
     }
     else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
-        newMultiplier *= 4; // King Bomb x4
+        newMultiplier *= 40;
     }
     // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
     if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {

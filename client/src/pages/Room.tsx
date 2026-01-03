@@ -13,6 +13,7 @@ import InteractionLayer, { InteractionEvent } from '@/components/InteractionLaye
 import QuickChat from '@/components/QuickChat'
 import { Bot, Clock, X } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { playSpecialSfx } from '@/services/sfx'
 
 function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
   const [timeLeft, setTimeLeft] = useState(0)
@@ -182,6 +183,7 @@ export default function Room() {
 
   // Toggle card selection
   const toggleCard = (index: number) => {
+    playSpecialSfx('select')
     setSelectedCards(prev => 
       prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     )
@@ -199,11 +201,13 @@ export default function Room() {
       toast.error('请选择要出的牌')
       return
     }
+    playSpecialSfx('button')
     playCards(cardsToPlay)
     setSelectedCards([])
   }
 
   const handlePass = () => {
+    playSpecialSfx('button')
     pass()
     setSelectedCards([])
   }
@@ -227,12 +231,14 @@ export default function Room() {
   const isReturnPhase = isPlaying && gameState.status === 'tribute_return'
 
   const toggleTributeCard = (index: number) => {
+    playSpecialSfx('select')
     setSelectedTributeCards(prev =>
       prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     )
   }
 
   const toggleReturnCard = (index: number) => {
+    playSpecialSfx('select')
     setSelectedReturnCards(prev =>
       prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     )
@@ -605,7 +611,7 @@ export default function Room() {
           )}
 
           {/* Hand Cards */}
-          <div className="flex -space-x-8 hover:-space-x-4 transition-all duration-300 px-4 overflow-x-auto max-w-full pb-4 pt-4 min-h-[160px] items-end pointer-events-auto">
+          <div className="flex -space-x-8 px-4 overflow-x-auto max-w-full pb-4 pt-4 min-h-[160px] items-end pointer-events-auto">
             {myHand.map((card, idx) => (
               <motion.div 
                 key={`${card.rank}-${card.suit}-${idx}`} 
@@ -613,7 +619,6 @@ export default function Room() {
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: idx * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
-                whileHover={{ y: -24 }}
               >
                 <Card 
                   card={card} 

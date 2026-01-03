@@ -6,7 +6,7 @@ type SfxEvt = {
   cardRank?: string // e.g. '3', '4', ..., 'K', 'A', '2', 'JOKER_SMALL', 'JOKER_BIG'
 }
 
-const BASE = '/assets/sounds'
+const BASE = `${import.meta.env.BASE_URL}assets/sounds`.replace(/\/+/g, '/')
 
 // Simple SFX fallbacks
 const MAP: Record<string, string> = {
