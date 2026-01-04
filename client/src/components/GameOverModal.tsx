@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
 import { Player } from '@/types'
+import { useEffect } from 'react'
+import { bgmPlayer } from '@/services/bgm'
 
 interface GameOverModalProps {
   results: {
@@ -15,6 +17,11 @@ interface GameOverModalProps {
 export default function GameOverModal({ results, players, myId, onClose }: GameOverModalProps) {
   const myRank = results.finishedOrder.indexOf(players.findIndex(p => p.id === myId)) + 1
   const isVictory = myRank === 1 || (players.length === 4 && myRank <= 2) // Simple logic
+
+  // 播放胜利/失败音乐
+  useEffect(() => {
+    bgmPlayer.play(isVictory ? 'win' : 'lose')
+  }, [isVictory])
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">

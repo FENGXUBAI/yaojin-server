@@ -11,6 +11,7 @@ import ChatBubble from '@/components/ChatBubble'
 import GameOverModal from '@/components/GameOverModal'
 import InteractionLayer, { InteractionEvent } from '@/components/InteractionLayer'
 import QuickChat from '@/components/QuickChat'
+import BGMController from '@/components/BGMController'
 import { Bot, Clock, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { playSpecialSfx } from '@/services/sfx'
@@ -285,6 +286,9 @@ export default function Room() {
       setInteractionMenuTarget(null)
       setMenuPosition(null)
     }}>
+      {/* BGM Controller */}
+      <BGMController scene="game" className="fixed bottom-4 left-4 z-50" />
+
       {/* Top Bar */}
       <div className="h-14 bg-slate-800/80 backdrop-blur border-b border-slate-700 flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-4">

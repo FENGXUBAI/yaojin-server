@@ -4,6 +4,7 @@ import { useGameStore } from '@/store/gameStore'
 import { LogOut, Plus, Play, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import BGMController from '@/components/BGMController'
 
 export default function Lobby() {
   const navigate = useNavigate()
@@ -51,6 +52,9 @@ export default function Lobby() {
 
   return (
     <div className="min-h-screen bg-slate-900 p-6">
+      {/* BGM Controller */}
+      <BGMController scene="lobby" className="fixed bottom-4 left-4 z-50" />
+
       {/* Header */}
       <header className="flex justify-between items-center mb-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
