@@ -165,42 +165,7 @@ export function playTurn(state: GameState, action: Action): GameState {
     return { ...state, currentPlayer: nextActivePlayer(state, state.currentPlayer) };
   }
   if (action.type === 'pass') {
-    // 接风逻辑处理
-    if (state.jiefengState) {
-      const jf = state.jiefengState;
-      // 当前检查的玩家选择不压牌
-      const newSkipped = [...jf.skippedPlayers, state.currentPlayer];
-      
-      // 找下一个要检查的玩家（跳过已经pass的、跑了的、以及下家）
-      let nextChecker = nextActivePlayer(state, state.currentPlayer);
-      
-      // 如果转了一圈回到下家，或者只剩下家了，则下家接风
-      if (nextChecker === jf.nextPlayer || nextChecker === -1) {
-        // 接风成功：下家可以自由出牌
-        return {
-          ...state,
-          currentPlayer: jf.nextPlayer,
-          lastPlay: null, // 自由出牌
-          lastPlayOwner: null,
-          passesInRow: 0,
-          jiefengState: null,
-          currentTrickPlays: [],
-        };
-      }
-      
-      // 还有其他玩家需要检查
-      return {
-        ...state,
-        currentPlayer: nextChecker,
-        jiefengState: {
-          ...jf,
-          checkingPlayer: nextChecker,
-          skippedPlayers: newSkipped,
-        },
-      };
-    }
-    
-    // 正常pass逻辑
+    // 正常pass逻辑（无接风）
     const next = nextActivePlayer(state, state.currentPlayer);
     let lastPlay = state.lastPlay;
     let lastPlayOwner = state.lastPlayOwner;
@@ -389,59 +354,25 @@ export function playTurn(state: GameState, action: Action): GameState {
       nextPlayer = nextActivePlayer(tempStateForNext, state.currentPlayer);
   }
   
-  // Update Multiplier
+  // Update Multiplier (累乘，不封顶)
+  // 炸(TRIPLE)=×20，轰(FOUR)=×40，王炸=×40
+  // 第一炸=20，第二炸=400，第三轰=16000...
   let newMultiplier = state.multiplier;
-    // 规则：炸(TRIPLE)=x20，轰(FOUR)=x40，王炸=x40
-    if (pattern.type === 'TRIPLE') {
-      newMultiplier *= 20;
-    } else if (pattern.type === 'FOUR') {
-      newMultiplier *= 40;
-    } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
-      newMultiplier *= 40;
-    }
-  // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
-  if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {
-      newMultiplier *= 2; // Additional x2 for 4s bomb (Total x4)
+  if (pattern.type === 'TRIPLE') {
+    newMultiplier *= 20;
+  } else if (pattern.type === 'FOUR') {
+    newMultiplier *= 40;
+  } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
+    newMultiplier *= 40;
   }
 
-  // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
-  let jiefengState: JiefengState | null = null;
-  const playerJustFinished = newHand.length === 0 && !state.finishedOrder.includes(state.currentPlayer);
-  
-  if (playerJustFinished && finishedOrder.length < state.playerCount) {
-    // 玩家刚刚跑了，开始接风流程
-    const finishedPlayer = state.currentPlayer;
-    const lastPlayPattern = { ...pattern, by: state.currentPlayer };
-    
-    // 找到下家（跑了的人的下一个未完成的玩家）
-    const nextAfterFinished = nextActivePlayer({ ...state, finishedOrder }, finishedPlayer);
-    
-    if (nextAfterFinished !== -1) {
-      // 找到下家之后的下一个人来检查是否能压牌
-      const checkingPlayer = nextActivePlayer({ ...state, finishedOrder }, nextAfterFinished);
-      
-      if (checkingPlayer !== -1 && checkingPlayer !== nextAfterFinished) {
-        // 有其他玩家需要检查，进入接风流程
-        jiefengState = {
-          finishedPlayer,
-          lastPlayCards: lastPlayPattern,
-          nextPlayer: nextAfterFinished,
-          checkingPlayer,
-          skippedPlayers: [],
-        };
-        nextPlayer = checkingPlayer; // 先让检查的玩家决定是否要压
-      } else {
-        // 只剩一个活跃玩家，直接接风
-        nextPlayer = nextAfterFinished;
-        // 不设置接风状态，因为这个玩家可以自由出牌（lastPlay会被清空）
-      }
-    }
-  }
+  // 玩家跑了后：正常轮转，最后出的牌让后面轮一圈，都pass则下家自由出牌
+  // （无接风逻辑，由正常pass流程处理）
 
   const next: GameState = {
     ...state,
     hands: newHands,
-    lastPlay: jiefengState ? { ...pattern, by: state.currentPlayer } : { ...pattern, by: state.currentPlayer },
+    lastPlay: { ...pattern, by: state.currentPlayer },
     lastPlayOwner: state.currentPlayer,
     passesInRow: 0,
     currentPlayer: nextPlayer,
@@ -449,7 +380,7 @@ export function playTurn(state: GameState, action: Action): GameState {
     tablePlays: finalTablePlays,
     currentTrickPlays: newCurrentTrickPlays,
     multiplier: newMultiplier,
-    jiefengState,
+    jiefengState: null,
   };
   return next;
 }
@@ -541,13 +472,14 @@ export function computeTributePlan(playerCount: number, finishedOrder: number[],
   }
   
   const donors: { donor: number; receiver: number; count: number }[] = [];
-  // 规则：“第三个跑了的人要把牌中最大的一张给第二个跑了的人”
-  if (playerCount >= 3 && finishedOrder.length >= 3) {
-    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
-  }
-  // 规则：“第四个跑了的人要把牌中最大的两张张给第一个跑了的人”
-  if (playerCount >= 4 && finishedOrder.length >= 4) {
+  
+  if (playerCount === 3 && finishedOrder.length >= 3) {
+    // 3人游戏：第3名给第1名进贡1张
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[0], count: 1 });
+  } else if (playerCount >= 4 && finishedOrder.length >= 4) {
+    // 4人游戏：第4名给第1名进贡2张，第3名给第2名进贡1张
     donors.push({ donor: finishedOrder[3], receiver: finishedOrder[0], count: 2 });
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
   }
   
   return { donorToReceiver: donors, revolution: false };
