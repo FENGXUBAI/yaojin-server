@@ -14,6 +14,9 @@ import QuickChat from '@/components/QuickChat'
 import BGMController from '@/components/BGMController'
 import { Bot, Clock, X } from 'lucide-react'
 import { motion } from 'framer-motion'
+import Coins from '@/components/Coins'
+import { ITEMS } from '@/components/InteractionLayer'
+import { isQuickVoiceLabel, playQuickVoiceByLabel } from '@/services/quickVoice'
 import { playSpecialSfx } from '@/services/sfx'
 
 function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
@@ -93,6 +96,10 @@ export default function Room() {
     }
 
     const onChatMessage = (data: { player: string, message: string, isEmoji: boolean }) => {
+      if (!data.isEmoji && isQuickVoiceLabel(data.message)) {
+        playQuickVoiceByLabel(data.message)
+      }
+
       const player = room?.players.find(p => p.name === data.player)
       if (player) {
         setChatBubbles(prev => [...prev, { 
@@ -226,6 +233,17 @@ export default function Room() {
   const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
 
+  const bgmScene = useMemo(() => {
+    if (gameOverData && room && gameSocket.id) {
+      const myPlayerIdx = room.players.findIndex(p => p.id === gameSocket.id)
+      const finishedOrder: number[] = Array.isArray(gameOverData.finishedOrder) ? gameOverData.finishedOrder : []
+      const myRank = finishedOrder.indexOf(myPlayerIdx) + 1
+      const isVictory = myRank === 1 || (room.players.length === 4 && myRank > 0 && myRank <= 2)
+      return isVictory ? 'win' : 'lose'
+    }
+    return 'game'
+  }, [gameOverData, room, gameSocket.id])
+
   const pendingTribute = isPlaying ? gameState.pendingTributes?.find(p => p.actionBy === myIndex) : undefined
   const pendingReturn = isPlaying ? gameState.pendingReturns?.find(p => p.actionBy === myIndex) : undefined
   const isTributePhase = isPlaying && gameState.status === 'tribute'
@@ -286,9 +304,6 @@ export default function Room() {
       setInteractionMenuTarget(null)
       setMenuPosition(null)
     }}>
-      {/* BGM Controller */}
-      <BGMController scene="game" className="fixed bottom-4 left-4 z-50" />
-
       {/* Top Bar */}
       <div className="h-14 bg-slate-800/80 backdrop-blur border-b border-slate-700 flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-4">
@@ -299,6 +314,9 @@ export default function Room() {
           <span className="text-xs px-2 py-0.5 bg-slate-700 rounded text-slate-300">
             {room.playerCount}人局
           </span>
+
+          {/* BGM 开关按钮：放到房间信息右侧 */}
+          <BGMController scene={bgmScene} className="" />
         </div>
         <div className="flex items-center gap-4">
           {isPlaying && (
@@ -354,19 +372,20 @@ export default function Room() {
                 const x = (randX - 0.5) * 300
                 const y = (randY - 0.5) * 160
                 const rot = (randRot - 0.5) * 60 // +/- 30 deg
+                const isLastPlay = idx === (gameState.tablePlays || []).length - 1
 
                 return (
                   <div 
                     key={`${play.by}-${idx}`} 
-                    className="absolute left-1/2 top-1/2 flex flex-col items-center transition-all duration-500" 
+                    className={`absolute left-1/2 top-1/2 flex flex-col items-center transition-all duration-500 ${isLastPlay ? 'z-50' : ''}`}
                     style={{ 
-                      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${rot}deg)`,
-                      zIndex: idx 
+                      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${rot}deg) ${isLastPlay ? 'scale(1.2)' : ''}`,
+                      zIndex: isLastPlay ? 100 : idx 
                     }}
                   >
-                     <div className="flex -space-x-8">
+                     <div className={`flex -space-x-8 p-2 rounded-xl ${isLastPlay ? 'bg-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.5)] border border-yellow-400/50 backdrop-blur-sm animate-pulse' : ''}`}>
                        {play.cards.map((c, i) => (
-                         <Card key={i} card={c} scale={0.6} hideBottomInfo={true} /> 
+                         <Card key={i} card={c} scale={isLastPlay ? 0.75 : 0.6} hideBottomInfo={true} /> 
                        ))}
                      </div>
                   </div>
@@ -403,8 +422,8 @@ export default function Room() {
               onClick={(e) => handleCharacterClick(topPlayer.player.id, e)}
             />
 
-            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              💰 {topPlayer.player.score}
+            <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              <Coins size={14} /> <span>{topPlayer.player.score}</span>
             </div>
             
             {topPlayer.player.isTrusteeship && (
@@ -438,8 +457,8 @@ export default function Room() {
               onClick={(e) => handleCharacterClick(leftPlayer.player.id, e)}
             />
 
-            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              💰 {leftPlayer.player.score}
+            <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              <Coins size={14} /> <span>{leftPlayer.player.score}</span>
             </div>
 
             {leftPlayer.player.isTrusteeship && (
@@ -473,8 +492,8 @@ export default function Room() {
               onClick={(e) => handleCharacterClick(rightPlayer.player.id, e)}
             />
 
-            <div className="text-xs text-yellow-400 mt-0.5 font-bold bg-black/40 px-2 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              💰 {rightPlayer.player.score}
+            <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
+              <Coins size={14} /> <span>{rightPlayer.player.score}</span>
             </div>
 
             {rightPlayer.player.isTrusteeship && (
@@ -680,15 +699,15 @@ export default function Room() {
                  <button onClick={() => setInteractionMenuTarget(null)} className="text-slate-400 hover:text-white"><X size={14}/></button>
                </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {['tomato', 'bomb', 'flower', 'kiss', 'egg'].map(item => (
+            <div className="grid grid-cols-5 gap-1.5 min-w-[280px]">
+              {Object.entries(ITEMS).map(([key, item]) => (
                 <button 
-                  key={item}
-                  onClick={() => sendInteraction(item)}
-                  className="text-2xl p-2 bg-slate-700/50 hover:bg-slate-600 rounded-lg transition-transform hover:scale-110 active:scale-95"
-                  title={item}
+                  key={key}
+                  onClick={() => sendInteraction(key)}
+                  className="text-2xl p-2 bg-slate-700/50 hover:bg-slate-600 rounded-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center aspect-square"
+                  title={key}
                 >
-                  {{ tomato: '🍅', bomb: '💣', flower: '🌹', kiss: '💋', egg: '🥚' }[item]}
+                  {item.emoji}
                 </button>
               ))}
             </div>

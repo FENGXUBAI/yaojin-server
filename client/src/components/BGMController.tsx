@@ -4,7 +4,7 @@ import { bgmPlayer } from '@/services/bgm'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface BGMControllerProps {
-  scene?: 'lobby' | 'game' | 'none'
+  scene?: 'lobby' | 'game' | 'win' | 'lose' | 'none'
   className?: string
 }
 

@@ -9,7 +9,8 @@ const BASE = `${import.meta.env.BASE_URL}assets/sounds/bgm`.replace(/\/+/g, '/')
 
 // BGM 文件映射（可根据实际文件调整）
 const BGM_FILES: Record<BGMScene, string | null> = {
-  lobby: 'lobby.mp3',
+  // NOTE: 当前 public/assets/sounds/bgm 下没有 lobby.mp3，先用 game.mp3 兜底。
+  lobby: 'game.mp3',
   game: 'game.mp3',
   win: 'win.mp3',
   lose: 'lose.mp3',
@@ -31,6 +32,8 @@ class BGMPlayer {
   private enabled: boolean = true
   private volume: number = 0.3
   private fadeInterval: number | null = null
+  private pendingScene: BGMScene | null = null
+  private unlockBound = false
 
   constructor() {
     // 从 localStorage 读取用户偏好
@@ -78,7 +81,9 @@ class BGMPlayer {
       this.audio.play().then(() => {
         this.fadeIn(VOLUME_CONFIG[scene] * this.volume)
       }).catch(() => {
-        // 自动播放被阻止，等用户交互后再播放
+        // 自动播放被阻止：记录待播放场景，并在用户首次交互后重试
+        this.pendingScene = scene
+        this.bindUnlockOnce()
       })
     })
   }
@@ -111,8 +116,31 @@ class BGMPlayer {
    */
   resume() {
     if (this.audio && this.enabled) {
-      this.audio.play().catch(() => {})
+      this.audio.play().catch(() => {
+        this.pendingScene = this.currentScene
+        this.bindUnlockOnce()
+      })
     }
+  }
+
+  private bindUnlockOnce() {
+    if (this.unlockBound || typeof window === 'undefined') return
+    this.unlockBound = true
+
+    const unlock = () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+      this.unlockBound = false
+
+      const scene = this.pendingScene
+      this.pendingScene = null
+      if (scene && this.enabled && scene !== 'none') {
+        this.play(scene)
+      }
+    }
+
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
   }
 
   /**

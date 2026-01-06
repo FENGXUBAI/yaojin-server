@@ -10,12 +10,17 @@ export interface InteractionEvent {
   endRect: DOMRect
 }
 
-const ITEMS: Record<string, { emoji: string; splatEmojis?: string[]; splatColor?: string }> = {
+export const ITEMS: Record<string, { emoji: string; splatEmojis?: string[]; splatColor?: string }> = {
   tomato: { emoji: '🍅', splatEmojis: ['💥', '🔴', '🟠'], splatColor: 'rgba(255, 0, 0, 0.6)' },
   bomb: { emoji: '💣', splatEmojis: ['💥', '🔥', '💨'], splatColor: 'rgba(255, 165, 0, 0.7)' },
   flower: { emoji: '🌹', splatEmojis: ['💕', '✨', '💖'] },
   kiss: { emoji: '💋', splatEmojis: ['💕', '💗', '❤️'] },
-  egg: { emoji: '🥚', splatEmojis: ['💥', '🟡', '🍳'], splatColor: 'rgba(255, 255, 0, 0.5)' }
+  egg: { emoji: '🥚', splatEmojis: ['💥', '🟡', '🍳'], splatColor: 'rgba(255, 255, 0, 0.5)' },
+  beer: { emoji: '🍻', splatEmojis: ['🍺', '🌊', '🥴'], splatColor: 'rgba(255, 200, 0, 0.5)' },
+  poop: { emoji: '💩', splatEmojis: ['💩', '💨', '🤢'], splatColor: 'rgba(100, 70, 20, 0.6)' },
+  brick: { emoji: '🧱', splatEmojis: ['🔨', '💥', '🧱'], splatColor: 'rgba(200, 100, 100, 0.6)' },
+  water: { emoji: '🪣', splatEmojis: ['💧', '🌊', '💦'], splatColor: 'rgba(0, 100, 255, 0.5)' },
+  chicken: { emoji: '🐔', splatEmojis: ['🥚', '🍗', '🐓'], splatColor: 'rgba(255, 255, 255, 0.6)' }
 }
 
 export default function InteractionLayer({ events, onComplete }: { events: InteractionEvent[], onComplete: (id: string) => void }) {
