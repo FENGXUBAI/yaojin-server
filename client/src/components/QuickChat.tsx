@@ -6,24 +6,39 @@ interface QuickChatProps {
   onSend: (msg: string, isEmoji: boolean) => void
 }
 
+// 快捷语音短语（文件名需要和 quickchat/ 目录下的 mp3 一致）
 const QUICK_PHRASES = [
-  "快点啊，我等的花儿都谢了",
-  "你的牌打得太好了",
-  "交个朋友吧",
-  "谢谢你",
-  "再见",
-  "不要走，决战到天亮",
-  "你是MM还是GG",
-  "很高兴见到你"
+  "不要走~决战到天亮",
+  "你们可能不知道",
+  "你是MM还是哥哥~",
+  "全体起立",
+  "卢本伟广场",
+  "当年陈刀仔",
+  "得得得得得得得得得得得得",
+  "快点啊，都的我花都谢了",
+  "玩游戏一定要笑"
 ]
 
 const EMOJIS = ["😊", "😂", "😭", "😡", "👍", "🤝", "🌹", "☕", "💣", "🐷"]
+
+// 播放快捷语音
+const BASE = `${import.meta.env.BASE_URL}assets/sounds/quickchat`.replace(/\/+/g, '/')
+function playQuickVoice(phrase: string) {
+  try {
+    const audio = new Audio(`${BASE}/${encodeURIComponent(phrase)}.mp3`)
+    audio.volume = 0.8
+    audio.play().catch(() => {})
+  } catch {}
+}
 
 export default function QuickChat({ onSend }: QuickChatProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleSend = (msg: string, isEmoji: boolean) => {
     onSend(msg, isEmoji)
+    if (!isEmoji) {
+      playQuickVoice(msg) // 播放语音
+    }
     setIsOpen(false)
   }
 
