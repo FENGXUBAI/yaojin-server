@@ -92,7 +92,7 @@ export default function VFXOverlay({ lastPlay }: VFXOverlayProps) {
       playSpecialSfx('bomb')
     } else if (lastPlay.type === 'FOUR') {
       setEffect({ type: 'hong', id: timestamp })
-      playSpecialSfx('bomb')
+      playSpecialSfx('special_bomb')
     } else if (lastPlay.type === 'PAIR' && lastPlay.extra?.isKingBomb) {
       setEffect({ type: 'wangzha', id: timestamp })
       playSpecialSfx('wangzha')

@@ -361,13 +361,14 @@ export function playTurn(state: GameState, action: Action): GameState {
       });
       newCurrentTrickPlays.push({ by: state.currentPlayer, cards: action.cards });
 
-      // Update Multiplier for Capture (Qi)
-      let newMultiplier = state.multiplier;
-      if (captureType === 'TRIPLE') { // Qi Hong (3 fours)
-          newMultiplier *= 4; 
-      } else if (captureType === 'PAIR') { // Qi Zha (2 fours)
-          newMultiplier *= 2;
-      }
+        // Update Multiplier for Capture (Qi)
+        // 规则：起炸(2张4) ×20；起轰(3张4) ×40
+        let newMultiplier = state.multiplier;
+        if (captureType === 'TRIPLE') { // Qi Hong (3 fours)
+          newMultiplier *= 40;
+        } else if (captureType === 'PAIR') { // Qi Zha (2 fours)
+          newMultiplier *= 20;
+        }
 
       const nextState: GameState = {
         ...state,
@@ -452,17 +453,16 @@ export function playTurn(state: GameState, action: Action): GameState {
       nextPlayer = nextActivePlayer(tempStateForNext, state.currentPlayer);
   }
   
-  // Update Multiplier
-  let newMultiplier = state.multiplier;
-  if (pattern.type === 'FOUR') {
-      newMultiplier *= 2; // Bomb x2
-  } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
-      newMultiplier *= 4; // King Bomb x4
-  }
-  // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
-  if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {
-      newMultiplier *= 2; // Additional x2 for 4s bomb (Total x4)
-  }
+    // Update Multiplier (累乘，不封顶)
+    // 规则：炸弹(TRIPLE) ×20；轰(FOUR) ×40；王炸按轰处理 ×40
+    let newMultiplier = state.multiplier;
+    if (pattern.type === 'TRIPLE') {
+      newMultiplier *= 20;
+    } else if (pattern.type === 'FOUR') {
+      newMultiplier *= 40;
+    } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
+      newMultiplier *= 40;
+    }
 
   // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
   let jiefengState: JiefengState | null = null;

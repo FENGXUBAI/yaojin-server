@@ -33,13 +33,8 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [enabled])
 
-  const toggleEnabled = () => {
-    const newEnabled = !enabled
-    setEnabled(newEnabled)
-    bgmPlayer.setEnabled(newEnabled)
-    if (newEnabled && scene !== 'none') {
-      bgmPlayer.play(scene)
-    }
+  const toggleSlider = () => {
+    setShowSlider(s => !s)
   }
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,15 +46,13 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
   return (
     <div 
       className={`relative ${className}`}
-      onMouseEnter={() => setShowSlider(true)}
-      onMouseLeave={() => setShowSlider(false)}
     >
       <button
-        onClick={toggleEnabled}
+        onClick={toggleSlider}
         className="w-10 h-10 rounded-full bg-slate-700/80 hover:bg-slate-600 flex items-center justify-center text-white shadow-lg transition-all"
-        title={enabled ? '关闭背景音乐' : '开启背景音乐'}
+        title={'调节背景音乐音量'}
       >
-        {enabled ? (
+        {volume > 0 ? (
           <Music size={20} className="text-yellow-400" />
         ) : (
           <VolumeX size={20} className="text-slate-400" />
@@ -67,7 +60,7 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
       </button>
 
       <AnimatePresence>
-        {showSlider && enabled && (
+        {showSlider && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

@@ -25,12 +25,13 @@ class GameSocket {
     }
 
     this.socket = io(url, {
-      transports: ['websocket'],
+      // 允许 polling 回退，避免部分网络/代理下 websocket 握手卡很久
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
+      timeout: 12000,
       // Keep connection alive across page navigation
       forceNew: false,
     })

@@ -173,9 +173,10 @@ export function playSfx(evt: SfxEvt) {
 }
 
 // Play special effect sound (for bomb VFX etc)
-export function playSpecialSfx(type: 'bomb' | 'wangzha' | 'flower' | 'multiply' | 'plane' | 'star' | 'deal' | 'select' | 'win' | 'lose' | 'coins' | 'button') {
+export function playSpecialSfx(type: 'bomb' | 'special_bomb' | 'wangzha' | 'flower' | 'multiply' | 'plane' | 'star' | 'deal' | 'select' | 'win' | 'lose' | 'coins' | 'button') {
   const files: Record<string, string> = {
     bomb: 'common/bomb.mp3',
+    special_bomb: 'voice/special_bomb.ogg',
     wangzha: 'common/rocket.mp3',
     flower: 'voice/special_flower.ogg',
     multiply: 'common/beishu.mp3',

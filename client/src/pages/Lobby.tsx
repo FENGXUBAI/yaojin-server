@@ -10,7 +10,7 @@ export default function Lobby() {
   const navigate = useNavigate()
   const user = useUserStore(state => state.user)
   const logout = useUserStore(state => state.logout)
-  const { createRoom, joinRoom, quickMatch } = useGameStore()
+  const { createRoom, joinRoom, quickMatch, connect } = useGameStore()
   const [roomIdInput, setRoomIdInput] = useState('')
   const [playerCount, setPlayerCount] = useState<3 | 4>(3)
 
@@ -18,6 +18,8 @@ export default function Lobby() {
     if (!user) {
       navigate('/')
     }
+    // 进入大厅时确保 Socket 已连接，减少点击后的等待
+    connect()
   }, [user, navigate])
 
   const handleCreateRoom = async () => {

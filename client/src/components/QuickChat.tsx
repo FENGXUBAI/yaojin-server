@@ -32,7 +32,7 @@ export default function QuickChat({ onSend }: QuickChatProps) {
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="absolute bottom-14 right-0 w-64 bg-slate-800/95 backdrop-blur border border-slate-600 rounded-xl shadow-2xl p-3 z-50 flex flex-col gap-3"
+            className="fixed bottom-28 right-8 w-72 bg-slate-800/95 backdrop-blur border border-slate-600 rounded-xl shadow-2xl p-3 z-[1000] flex flex-col gap-3 max-h-72 overflow-y-auto"
           >
             {/* Emojis */}
             <div className="grid grid-cols-5 gap-2">
@@ -50,12 +50,12 @@ export default function QuickChat({ onSend }: QuickChatProps) {
             <div className="h-px bg-slate-700" />
 
             {/* Phrases */}
-            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+            <div className="flex flex-col gap-1">
               {QUICK_VOICES.map(({ label }) => (
                 <button
                   key={label}
                   onClick={() => handleSend(label, false)}
-                  className="text-left text-sm text-slate-200 hover:bg-slate-700 px-2 py-1.5 rounded transition-colors truncate"
+                  className="text-left text-sm leading-5 text-slate-200 hover:bg-slate-700 px-2 py-2 rounded transition-colors"
                 >
                   {label}
                 </button>

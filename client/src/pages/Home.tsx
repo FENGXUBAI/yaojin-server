@@ -1,17 +1,33 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '@/store/userStore'
+import { useGameStore } from '@/store/gameStore'
 import { Gamepad2, User } from 'lucide-react'
 
 export default function Home() {
   const navigate = useNavigate()
   const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
   const login = useUserStore(state => state.login)
+  const connect = useGameStore(state => state.connect)
+
+  // 预连接 Socket，减少后续创建/加入房间延迟
+  useEffect(() => {
+    connect()
+    // 预热服务端（Zeabur 冷启动时首个请求会慢）
+    fetch('/health').catch(() => {})
+  }, [connect])
 
   const handleLogin = async () => {
     if (!nickname.trim()) return
-    await login(nickname)
-    navigate('/lobby')
+    if (loading) return
+    setLoading(true)
+    try {
+      await login(nickname)
+      navigate('/lobby')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -49,7 +65,7 @@ export default function Home() {
             disabled={!nickname.trim()}
             className="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-bold rounded-lg shadow-lg shadow-primary-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98]"
           >
-            开始游戏
+            {loading ? '登录中…' : '开始游戏'}
           </button>
         </div>
       </div>
