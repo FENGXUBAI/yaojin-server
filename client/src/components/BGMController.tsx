@@ -9,29 +9,31 @@ interface BGMControllerProps {
 }
 
 export default function BGMController({ scene = 'lobby', className = '' }: BGMControllerProps) {
-  const [enabled, setEnabled] = useState(bgmPlayer.isEnabled())
   const [volume, setVolume] = useState(bgmPlayer.getVolume())
   const [showSlider, setShowSlider] = useState(false)
 
   // 场景变化时切换 BGM
   useEffect(() => {
-    if (enabled && scene !== 'none') {
+    if (scene !== 'none') {
+      // 需求已改为“调节音量”，不再使用开关语义。
+      // 为了兼容历史 localStorage 里可能残留的 enabled=false，这里强制启用。
+      bgmPlayer.setEnabled(true)
       bgmPlayer.play(scene)
     }
-  }, [scene, enabled])
+  }, [scene])
 
   // 页面可见性变化时暂停/恢复
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
         bgmPlayer.pause()
-      } else if (enabled) {
+      } else {
         bgmPlayer.resume()
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [enabled])
+  }, [])
 
   const toggleSlider = () => {
     setShowSlider(s => !s)
@@ -40,6 +42,7 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseFloat(e.target.value)
     setVolume(vol)
+    bgmPlayer.setEnabled(true)
     bgmPlayer.setVolume(vol)
   }
 

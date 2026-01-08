@@ -398,10 +398,7 @@ export function playTurn(state: GameState, action: Action): GameState {
   } else if (pattern.type === 'PAIR' && pattern.extra?.isKingBomb) {
       newMultiplier *= 40; // King Bomb x40 (Treat as Hong level)
   }
-  // Check for "Hong" (4 fours) - if pattern is FOUR of 4s
-  if (pattern.type === 'FOUR' && pattern.cards[0].rank === '4') {
-      newMultiplier *= 2; // Additional x2 for 4s bomb (Total x4)
-  }
+    // 不再对“4的轰”做额外倍数加成（保持：炸弹×20，轰×40，王炸×40）
 
   // 接风逻辑：如果当前玩家出牌后跑了，需要进行接风判定
   let jiefengState: JiefengState | null = null;

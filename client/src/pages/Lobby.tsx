@@ -20,7 +20,9 @@ export default function Lobby() {
     }
     // 进入大厅时确保 Socket 已连接，减少点击后的等待
     connect()
-  }, [user, navigate])
+    // 预热服务端（Zeabur 冷启动时首个请求会慢）
+    fetch('/health').catch(() => {})
+  }, [user, navigate, connect])
 
   const handleCreateRoom = async () => {
     try {
