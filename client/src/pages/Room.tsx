@@ -95,15 +95,16 @@ export default function Room() {
       }
     }
 
-    const onChatMessage = (data: { player: string, message: string, isEmoji: boolean }) => {
+    const onChatMessage = (data: { playerId?: string, player?: string, sender?: string, message: string, isEmoji: boolean }) => {
       if (!data.isEmoji && isQuickVoiceLabel(data.message)) {
         playQuickVoiceByLabel(data.message)
       }
 
-      const player = room?.players.find(p => p.name === data.player)
-      if (player) {
+      const name = data.sender ?? data.player
+      const resolvedPlayerId = data.playerId || (name ? room?.players.find(p => p.name === name)?.id : undefined)
+      if (resolvedPlayerId) {
         setChatBubbles(prev => [...prev, { 
-          playerId: player.id, 
+          playerId: resolvedPlayerId, 
           message: data.message, 
           isEmoji: data.isEmoji,
           id: Date.now() 

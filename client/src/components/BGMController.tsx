@@ -48,10 +48,14 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
 
   return (
     <div 
-      className={`relative ${className}`}
+      className={`relative pointer-events-auto ${className}`}
+      onClick={(e) => e.stopPropagation()}
     >
       <button
-        onClick={toggleSlider}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggleSlider()
+        }}
         className="w-10 h-10 rounded-full bg-slate-700/80 hover:bg-slate-600 flex items-center justify-center text-white shadow-lg transition-all"
         title={'调节背景音乐音量'}
       >
@@ -68,7 +72,7 @@ export default function BGMController({ scene = 'lobby', className = '' }: BGMCo
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur rounded-lg p-3 shadow-xl border border-slate-600 min-w-[140px]"
+            className="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur rounded-lg p-3 shadow-xl border border-slate-600 min-w-[140px] z-[200] pointer-events-auto"
           >
             <div className="flex items-center gap-2 mb-2">
               <VolumeX size={14} className="text-slate-400" />

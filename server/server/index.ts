@@ -454,6 +454,7 @@ const rooms = new Map<string, Room>();
 const socketRoom = new Map<string, string>();
 const socketClientKey = new Map<string, string>();
 const lastEventAt = new Map<string, number>();
+const lastEventAtKeyed = new Map<string, number>();
 
 function newClientKey() {
   return crypto.randomBytes(16).toString('hex');
@@ -472,6 +473,15 @@ function isRateLimited(socketId: string, minIntervalMs: number) {
   const prev = lastEventAt.get(socketId) ?? 0;
   if (now - prev < minIntervalMs) return true;
   lastEventAt.set(socketId, now);
+  return false;
+}
+
+function isRateLimitedKeyed(socketId: string, key: string, minIntervalMs: number) {
+  const now = Date.now();
+  const mapKey = `${socketId}:${key}`;
+  const prev = lastEventAtKeyed.get(mapKey) ?? 0;
+  if (now - prev < minIntervalMs) return true;
+  lastEventAtKeyed.set(mapKey, now);
   return false;
 }
 
@@ -1311,7 +1321,7 @@ io.on('connection', (socket: Socket) => {
 
   // 聊天消息处理
   socket.on('chatMessage', ({ room, message, isEmoji }: { room: string, message: string, isEmoji?: boolean }) => {
-    if (isRateLimited(socket.id, 100)) return;
+    if (isRateLimitedKeyed(socket.id, 'chatMessage', 100)) return;
     const r = rooms.get(room);
     if (!r) return;
     const player = r.players.find(p => p.id === socket.id);
@@ -1319,7 +1329,10 @@ io.on('connection', (socket: Socket) => {
     
     // 广播聊天消息给房间内所有玩家
     io.to(room).emit('chatMessage', {
+      // Backward/forward compatible fields
+      playerId: player.id,
       player: player.name,
+      sender: player.name,
       message: message,
       isEmoji: isEmoji || false
     });
@@ -1327,7 +1340,9 @@ io.on('connection', (socket: Socket) => {
 
   // 互动表情/道具
   socket.on('interaction', ({ room, targetId, type }: { room: string, targetId: string, type: string }) => {
-    if (isRateLimited(socket.id, 500)) return;
+    // Allow faster interaction bursts from clients (client may send at ~200ms intervals)
+    // Use a slightly smaller limit to tolerate timer jitter.
+    if (isRateLimitedKeyed(socket.id, 'interaction', 150)) return;
     const r = rooms.get(room);
     if (!r) return;
     
