@@ -166,17 +166,17 @@ export function resolveTribute(state: GameState, playerId: number, cards: Card[]
   newPendingTributes.splice(pendingIdx, 1);
 
   const newPendingReturns = [...state.pendingReturns];
-  // 3人局：第二名不吃贡也不回贡（也就是：末名给首名进贡，首名不需要回贡）
-  // 4人局：正常回贡（收几张回几张，由收贡者手动选择）
-  if (state.playerCount !== 3) {
-    newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
-  }
+  // 回贡规则（用户确认版）：
+  // - 3人局：末名 -> 首名 进贡1张；首名再向末名回贡1张（自选）。第二名不吃贡也不回贡。
+  // - 4人局：末名 -> 首名 进贡2张且首名回贡2张；第三 -> 第二 进贡1张且第二回贡1张。
+  // 统一实现：每一笔进贡都会生成一笔等张数的回贡，由收贡者手动选择。
+  newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
 
   const nextStatus = newPendingTributes.length === 0
     ? (newPendingReturns.length === 0 ? 'playing' : 'tribute_return')
     : 'tribute';
 
-  // 如果本局不进入回贡阶段（例如 3 人局规则），需要在此清理进贡标记
+  // 如果本局不进入回贡阶段（例如未来规则扩展），需要在此清理进贡标记
   if (nextStatus === 'playing') {
     for (const h of newHands) {
       for (const c of h) {
