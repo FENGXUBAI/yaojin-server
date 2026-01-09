@@ -535,7 +535,7 @@ function executeBotTurn(room: Room) {
     // Check game over
     if (nextState.finishedOrder.length >= nextState.playerCount) {
        // Calculate Scores (Bot Logic Duplication - Refactor ideally, but for now copy logic)
-       const baseScore = 1000;
+      const baseScore = 1;
        const multiplier = nextState.multiplier;
        const totalStake = baseScore * multiplier;
        const finished = nextState.finishedOrder;
@@ -1038,7 +1038,7 @@ io.on('connection', (socket: Socket) => {
          if (r.turnTimer) clearTimeout(r.turnTimer);
          
          // Calculate Scores
-         const baseScore = 1000;
+         const baseScore = 1;
          const multiplier = nextState.multiplier;
          const totalStake = baseScore * multiplier;
          const finished = nextState.finishedOrder;
@@ -1134,7 +1134,7 @@ io.on('connection', (socket: Socket) => {
         if (nextState.finishedOrder.length >= nextState.playerCount) {
              if (r.turnTimer) clearTimeout(r.turnTimer);
              
-             const baseScore = 1000;
+             const baseScore = 1;
              const multiplier = nextState.multiplier;
              const totalStake = baseScore * multiplier;
              const finished = nextState.finishedOrder;

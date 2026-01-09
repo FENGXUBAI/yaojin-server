@@ -65,6 +65,7 @@ export default function Room() {
   const [interactionMenuTarget, setInteractionMenuTarget] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{x: number, y: number} | null>(null)
   const [isX10, setIsX10] = useState(false)
+  const pendingHintKeyRef = useRef<string | null>(null)
   
   // Refs for positioning
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -112,14 +113,58 @@ export default function Room() {
       }
     }
 
+    const onHints = (data: { hintKey?: string, options?: any[] }) => {
+      // 如果是我们自己发起的提示请求，优先按 hintKey 匹配；否则忽略
+      if (pendingHintKeyRef.current && data?.hintKey && data.hintKey !== pendingHintKeyRef.current) return
+
+      const st = useGameStore.getState()
+      const r = st.room
+      const gs = st.gameState
+      const myId = gameSocket.id
+      if (!r || !gs || !myId) return
+
+      const myIdx = r.players.findIndex(p => p.id === myId)
+      if (myIdx < 0) return
+      if (gs.status !== 'playing') return
+      if (gs.currentPlayer !== myIdx) return
+
+      const hand = gs.hands?.[myIdx] ?? []
+      const options = Array.isArray(data?.options) ? data.options : []
+      const pick = options[0]
+      if (!Array.isArray(pick) || pick.length === 0) {
+        toast.error('没有可提示的牌')
+        return
+      }
+
+      // 将提示牌映射到当前手牌下标，并自动“提起来”（选中）
+      const used = new Array(hand.length).fill(false)
+      const nextSelected: number[] = []
+      for (const c of pick) {
+        const idx = hand.findIndex((h: any, i: number) => !used[i] && h?.rank === c?.rank && h?.suit === c?.suit)
+        if (idx >= 0) {
+          used[idx] = true
+          nextSelected.push(idx)
+        }
+      }
+      if (nextSelected.length === 0) {
+        toast.error('提示牌未能匹配到手牌')
+        return
+      }
+
+      playSpecialSfx('select')
+      setSelectedCards(nextSelected)
+    }
+
     gameSocket.on('gameOver', onGameOver)
     gameSocket.on('interaction', onInteraction)
     gameSocket.on('chatMessage', onChatMessage)
+    gameSocket.on('hints', onHints)
 
     return () => {
       gameSocket.off('gameOver', onGameOver)
       gameSocket.off('interaction', onInteraction)
       gameSocket.off('chatMessage', onChatMessage)
+      gameSocket.off('hints', onHints)
     }
   }, [room])
 
@@ -219,6 +264,15 @@ export default function Room() {
     playSpecialSfx('button')
     pass()
     setSelectedCards([])
+  }
+
+  const handleHint = () => {
+    if (!room || !gameState) return
+    if (!isPlaying || !isMyTurn) return
+    playSpecialSfx('button')
+    const hintKey = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    pendingHintKeyRef.current = hintKey
+    gameSocket.emit('getHints', { room: room.id, hintKey })
   }
 
   if (!room) {
@@ -393,7 +447,7 @@ export default function Room() {
                 )
               })}
               
-              <VFXOverlay lastPlay={gameState.lastPlay} />
+              <VFXOverlay lastPlay={gameState.lastPlay} gameId={gameState.gameId} />
             </div>
           )}
         </div>
@@ -619,10 +673,10 @@ export default function Room() {
                 不要
               </button>
               <button 
-                onClick={() => setSelectedCards([])}
+                onClick={handleHint}
                 className="px-6 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-full font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
               >
-                重选
+                提示
               </button>
               <button 
                 onClick={handlePlay}

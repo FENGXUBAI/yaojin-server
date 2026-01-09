@@ -26,7 +26,7 @@ export default function ChatBubble({ message, isEmoji, onComplete }: ChatBubbleP
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, scale: 0.5 }}
           className={`absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none
-            ${isEmoji ? 'text-4xl drop-shadow-md' : 'bg-white text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-none shadow-lg border border-slate-200 text-sm font-medium'}
+            ${isEmoji ? 'text-6xl drop-shadow-md' : 'bg-white text-slate-900 px-4 py-2 rounded-2xl rounded-bl-none shadow-lg border border-slate-200 text-base font-medium'}
           `}
         >
           {message}

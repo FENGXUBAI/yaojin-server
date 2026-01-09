@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pattern } from '@/types'
 import { playSpecialSfx } from '@/services/sfx'
 
 interface VFXOverlayProps {
   lastPlay: (Pattern & { by: number }) | null
+  gameId?: string
 }
 
 // Particle component for explosion effects
@@ -79,11 +80,28 @@ function FireParticles({ count = 15 }: { count?: number }) {
   )
 }
 
-export default function VFXOverlay({ lastPlay }: VFXOverlayProps) {
+export default function VFXOverlay({ lastPlay, gameId }: VFXOverlayProps) {
   const [effect, setEffect] = useState<{ type: 'zha' | 'hong' | 'wangzha', id: number } | null>(null)
+  const lastKeyRef = useRef<string>('')
 
   useEffect(() => {
-    if (!lastPlay) return
+    if (!lastPlay) {
+      lastKeyRef.current = ''
+      return
+    }
+
+    const key = [
+      gameId || '',
+      lastPlay.by,
+      lastPlay.type,
+      lastPlay.strength,
+      !!lastPlay.extra?.isKingBomb,
+      (lastPlay.cards || []).map(c => `${c.rank}${c.suit}`).join(',')
+    ].join('|')
+
+    // 去重：同一手牌的 lastPlay 即使被重复广播（例如“不要/过牌”）也只触发一次特效
+    if (key && key === lastKeyRef.current) return
+    lastKeyRef.current = key
 
     const timestamp = Date.now()
 
@@ -97,7 +115,7 @@ export default function VFXOverlay({ lastPlay }: VFXOverlayProps) {
       setEffect({ type: 'wangzha', id: timestamp })
       playSpecialSfx('wangzha')
     }
-  }, [lastPlay])
+  }, [lastPlay, gameId])
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">

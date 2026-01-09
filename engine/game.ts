@@ -166,11 +166,24 @@ export function resolveTribute(state: GameState, playerId: number, cards: Card[]
   newPendingTributes.splice(pendingIdx, 1);
 
   const newPendingReturns = [...state.pendingReturns];
-  newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
+  // 3人局：第二名不吃贡也不回贡（也就是：末名给首名进贡，首名不需要回贡）
+  // 4人局：正常回贡（收几张回几张，由收贡者手动选择）
+  if (state.playerCount !== 3) {
+    newPendingReturns.push({ actionBy: pending.giveTo, returnTo: pending.actionBy, count: pending.count });
+  }
 
   const nextStatus = newPendingTributes.length === 0
     ? (newPendingReturns.length === 0 ? 'playing' : 'tribute_return')
     : 'tribute';
+
+  // 如果本局不进入回贡阶段（例如 3 人局规则），需要在此清理进贡标记
+  if (nextStatus === 'playing') {
+    for (const h of newHands) {
+      for (const c of h) {
+        delete (c as any).isTribute;
+      }
+    }
+  }
 
   return {
     ...state,
@@ -601,13 +614,15 @@ export function computeTributePlan(playerCount: number, finishedOrder: number[],
   }
   
   const donors: { donor: number; receiver: number; count: number }[] = [];
-  // 规则：“第三个跑了的人要把牌中最大的一张给第二个跑了的人”
-  if (playerCount >= 3 && finishedOrder.length >= 3) {
-    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
+  // 进贡规则（用户确认版）：
+  // 3人：最后一名 -> 第一名（最大1张）；第二名不吃贡也不回贡。
+  // 4人：最后一名 -> 第一名（最大2张）；第三名 -> 第二名（最大1张）。
+  if (playerCount === 3 && finishedOrder.length >= 3) {
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[0], count: 1 });
   }
-  // 规则：“第四个跑了的人要把牌中最大的两张张给第一个跑了的人”
-  if (playerCount >= 4 && finishedOrder.length >= 4) {
+  if (playerCount === 4 && finishedOrder.length >= 4) {
     donors.push({ donor: finishedOrder[3], receiver: finishedOrder[0], count: 2 });
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
   }
   
   return { donorToReceiver: donors, revolution: false };
