@@ -57,7 +57,7 @@ app.post('/api/auth/guest', (req, res) => {
             id: userId,
             nickname: finalNickname,
             avatarUrl: '',
-            coins: 500000,
+            coins: 5000000,
             level: 1
         };
         users.set(userId, user);
@@ -91,7 +91,7 @@ app.post('/api/auth/wechat', (req, res) => {
                 id: userId,
                 nickname: nickname || `微信用户${Math.floor(Math.random() * 1000)}`,
                 avatarUrl: avatarUrl || '',
-                coins: 500000,
+                coins: 5000000,
                 level: 1
             };
             users.set(userId, user);
@@ -394,6 +394,7 @@ function executeBotTurn(room) {
     if (!room.gameState || room.gameState.status !== 'playing')
         return;
     const state = room.gameState;
+    const prevFinishedCount = state.finishedOrder.length;
     const currentPlayerIdx = state.currentPlayer;
     const player = room.players[currentPlayerIdx];
     if (!player)
@@ -405,6 +406,23 @@ function executeBotTurn(room) {
         // Simulate "thinking" delay is handled by the caller (setTimeout)
         const nextState = (0, game_1.playTurn)(state, action);
         room.gameState = nextState;
+        // Public announce before updating clients' gameState
+        if (nextState.finishedOrder.length > prevFinishedCount) {
+            const newFinishedIdx = nextState.finishedOrder[prevFinishedCount];
+            const finishedPlayer = room.players[newFinishedIdx];
+            if (finishedPlayer) {
+                io.to(room.id).emit('chatMessage', {
+                    playerId: finishedPlayer.id,
+                    sender: '系统',
+                    message: `${finishedPlayer.name}跑了`,
+                    isEmoji: false,
+                    timestamp: Date.now()
+                });
+                if (finishedPlayer.mvpSound) {
+                    emitMvp(room, { sound: finishedPlayer.mvpSound, name: finishedPlayer.name, durationMs: 10000 });
+                }
+            }
+        }
         io.to(room.id).emit('gameState', publicizeGameState(nextState));
         // Keep trusteeship player's hand in sync
         emitPrivateState(room);
@@ -479,7 +497,15 @@ function executeBotTurn(room) {
                 finishedOrder: nextState.finishedOrder,
                 revolution: nextState.revolution
             };
-            io.to(room.id).emit('gameOver', { finishedOrder: nextState.finishedOrder, scores: room.players.map(p => ({ id: p.id, score: p.score })), multiplier });
+            io.to(room.id).emit('gameOver', {
+                finishedOrder: nextState.finishedOrder,
+                scores: room.players.map(p => ({ id: p.id, score: p.score })),
+                deltas: room.players.map(p => ({
+                    id: p.id,
+                    delta: p.score - (room.roundStartScores?.[p.id] ?? p.score)
+                })),
+                multiplier
+            });
             // MVP Check
             const winnerIdx = nextState.finishedOrder[0];
             const winner = room.players[winnerIdx];
@@ -487,6 +513,7 @@ function executeBotTurn(room) {
                 emitMvp(room, { sound: winner.mvpSound, name: winner.name, durationMs: 15000 });
             }
             room.gameState = null;
+            room.roundStartScores = undefined;
             emitRoomState(room);
         }
         else {
@@ -682,7 +709,7 @@ io.on('connection', (socket) => {
                 id: socket.id,
                 name,
                 ready: false,
-                score: 500000,
+                score: 5000000,
                 mvpSound: undefined,
                 connected: true,
                 lastSeen: now,
@@ -757,6 +784,8 @@ io.on('connection', (socket) => {
             return;
         }
         try {
+            // Snapshot scores for round delta calculation
+            r.roundStartScores = Object.fromEntries(r.players.map(p => [p.id, p.score]));
             const state = (0, game_1.initGame)({
                 playerCount: r.players.length,
                 lastRoundResult: r.lastRoundResult
@@ -910,6 +939,16 @@ io.on('connection', (socket) => {
                 // (e.g. if 0 people finished, the new one is at index 0)
                 const newFinishedIdx = nextState.finishedOrder[prevFinishedCount];
                 const finishedPlayer = r.players[newFinishedIdx];
+                // Public announce (chat bubble on that player)
+                if (finishedPlayer) {
+                    io.to(room).emit('chatMessage', {
+                        playerId: finishedPlayer.id,
+                        sender: '系统',
+                        message: `${finishedPlayer.name}跑了`,
+                        isEmoji: false,
+                        timestamp: Date.now()
+                    });
+                }
                 if (finishedPlayer && finishedPlayer.mvpSound) {
                     emitMvp(r, { sound: finishedPlayer.mvpSound, name: finishedPlayer.name, durationMs: 10000 });
                 }
@@ -959,10 +998,15 @@ io.on('connection', (socket) => {
                 io.to(room).emit('gameOver', {
                     finishedOrder: nextState.finishedOrder,
                     scores: r.players.map(p => ({ id: p.id, score: p.score })),
+                    deltas: r.players.map(p => ({
+                        id: p.id,
+                        delta: p.score - (r.roundStartScores?.[p.id] ?? p.score)
+                    })),
                     multiplier: multiplier
                 });
                 // Reset to waiting so the next round can be started
                 r.gameState = null;
+                r.roundStartScores = undefined;
                 // Broadcast updated room info to show new scores immediately
                 emitRoomState(r);
             }

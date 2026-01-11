@@ -8,6 +8,7 @@ interface GameOverModalProps {
   results: {
     finishedOrder: number[]
     scores: { id: string, score: number }[]
+    deltas?: { id: string, delta: number }[]
     multiplier: number
   }
   players: Player[]
@@ -44,15 +45,16 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
           </motion.div>
 
           <div className="text-xl text-slate-300 mb-8 font-mono">
-            倍率: <span className="text-yellow-400 font-bold">x{results.multiplier}</span>
+            倍率: <span className="text-yellow-400 font-bold">x{formatCoins(results.multiplier)}</span>
           </div>
 
           <div className="space-y-3 mb-8">
             {results.finishedOrder.map((playerIdx, rank) => {
               const player = players[playerIdx]
               if (!player) return null
-              const score = results.scores.find(s => s.id === player.id)?.score || 0
+              const delta = results.deltas?.find(d => d.id === player.id)?.delta ?? 0
               const isMe = player.id === myId
+              const deltaColor = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-slate-400'
               
               return (
                 <div key={player.id} className={`flex items-center justify-between p-3 rounded-lg ${isMe ? 'bg-white/10 border border-white/20' : 'bg-black/20'}`}>
@@ -64,8 +66,8 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
                       {player.name}
                     </span>
                   </div>
-                  <div className="font-mono text-yellow-400">
-                    💰 {formatCoins(score)}
+                  <div className={`font-mono ${deltaColor}`}>
+                    {delta > 0 ? '+' : ''}{formatCoins(delta)}
                   </div>
                 </div>
               )
@@ -73,8 +75,9 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
             {/* Show remaining players who didn't finish if any */}
             {players.map((p, idx) => {
                 if (results.finishedOrder.includes(idx)) return null
-                const score = results.scores.find(s => s.id === p.id)?.score || 0
+              const delta = results.deltas?.find(d => d.id === p.id)?.delta ?? 0
                 const isMe = p.id === myId
+              const deltaColor = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-slate-400'
                 return (
                     <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${isMe ? 'bg-white/10 border border-white/20' : 'bg-black/20'}`}>
                       <div className="flex items-center gap-3">
@@ -85,8 +88,8 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
                           {p.name}
                         </span>
                       </div>
-                      <div className="font-mono text-yellow-400">
-                        💰 {formatCoins(score)}
+                      <div className={`font-mono ${deltaColor}`}>
+                        {delta > 0 ? '+' : ''}{formatCoins(delta)}
                       </div>
                     </div>
                 )

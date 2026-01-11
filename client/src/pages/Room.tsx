@@ -315,6 +315,7 @@ export default function Room() {
   const isOwner = room.ownerId === gameSocket.id
   const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
+  const finishedSet = useMemo(() => new Set<number>(isPlaying ? (gameState.finishedOrder ?? []) : []), [isPlaying, gameState?.finishedOrder])
 
   const bgmScene = useMemo(() => {
     if (gameOverData && room && gameSocket.id) {
@@ -502,6 +503,7 @@ export default function Room() {
               name={topPlayer.player.name}
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === topPlayer.index)}
+              isOut={isPlaying && finishedSet.has(topPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[topPlayer.index] ?? 0) : 0}
               onClick={(e) => handleCharacterClick(topPlayer.player.id, e)}
             />
@@ -537,6 +539,7 @@ export default function Room() {
               name={leftPlayer.player.name}
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === leftPlayer.index)}
+              isOut={isPlaying && finishedSet.has(leftPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[leftPlayer.index] ?? 0) : 0}
               onClick={(e) => handleCharacterClick(leftPlayer.player.id, e)}
             />
@@ -572,6 +575,7 @@ export default function Room() {
               name={rightPlayer.player.name}
               isMe={false}
               isTurn={!!(isPlaying && gameState.currentPlayer === rightPlayer.index)}
+              isOut={isPlaying && finishedSet.has(rightPlayer.index)}
               cardCount={isPlaying ? (gameState.handCounts?.[rightPlayer.index] ?? 0) : 0}
               onClick={(e) => handleCharacterClick(rightPlayer.player.id, e)}
             />
@@ -602,6 +606,7 @@ export default function Room() {
                name={myPlayer?.name || user?.nickname || '我'}
                isMe={true}
                isTurn={!!isMyTurn}
+               isOut={isPlaying && myIndex !== -1 && finishedSet.has(myIndex)}
                cardCount={0} 
                onClick={(e) => gameSocket.id && handleCharacterClick(gameSocket.id, e)}
              />
@@ -628,7 +633,7 @@ export default function Room() {
           {/* Multiplier */}
           {isPlaying && (
              <div className="absolute bottom-8 right-8 text-red-500 font-black text-4xl drop-shadow-lg animate-pulse z-30 pointer-events-none select-none" style={{ textShadow: '0 0 10px rgba(255,0,0,0.5)' }}>
-               x{gameState.multiplier}
+               x{formatCoins(gameState.multiplier)}
              </div>
           )}
 

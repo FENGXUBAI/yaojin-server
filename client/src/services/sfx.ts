@@ -136,6 +136,31 @@ function pickSimpleSfx(evt: any): string | null {
 }
 
 export function playSfx(evt: SfxEvt) {
+  // Four-of-a-kind bomb (轰): play both special_bomb + nzhadan
+  // Requirement: special_bomb.ogg + nzhadan.ogg
+  try {
+    const kind = (evt as any)?.kind
+    const patternType: string | undefined = (evt as any)?.patternType
+    if (kind === 'play' && patternType === 'FOUR') {
+      const a = new Audio(`${BASE}/voice/special_bomb.ogg`)
+      a.volume = 0.8
+      void a.play()
+
+      // Slight delay so the second sound doesn't fully mask the first
+      setTimeout(() => {
+        try {
+          const b = new Audio(`${BASE}/voice/nzhadan.ogg`)
+          b.volume = 0.8
+          void b.play()
+        } catch {}
+      }, 80)
+
+      return
+    }
+  } catch {
+    // fallthrough
+  }
+
   // Try voice first, then fallback to simple SFX
   const voiceFile = pickVoiceFile(evt)
   

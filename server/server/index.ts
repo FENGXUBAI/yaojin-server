@@ -305,7 +305,7 @@ app.post('/api/match/quick', (req, res) => {
         id: `bot_${i}_${Date.now()}`,
         name: shuffledBotNames[i] || `机器人${i + 1}`,
         ready: true,
-        score: 10000,
+        score: 5_000_000,
         connected: true,
         lastSeen: Date.now(),
         clientKey: `bot_${i}`,
@@ -442,6 +442,7 @@ interface Room {
   owner: string;
   gameState: GameState | null;
   lastRoundResult?: { finishedOrder: number[]; revolution: boolean };
+  roundStartScores?: Record<string, number>;
   turnTimer?: NodeJS.Timeout;
   eventSeq: number;
   recentSfxEvents: Array<{ seq: number; evt: any }>;
@@ -514,6 +515,7 @@ function executeBotTurn(room: Room) {
   if (!room.gameState || room.gameState.status !== 'playing') return;
   
   const state = room.gameState;
+  const prevFinishedCount = state.finishedOrder.length;
   const currentPlayerIdx = state.currentPlayer;
   const player = room.players[currentPlayerIdx];
   
@@ -527,6 +529,25 @@ function executeBotTurn(room: Room) {
     
     const nextState = playTurn(state, action);
     room.gameState = nextState;
+
+    // Public announce before clients receive updated finishedOrder
+    if (nextState.finishedOrder.length > prevFinishedCount) {
+      const newFinishedIdx = nextState.finishedOrder[prevFinishedCount];
+      const finishedPlayer = room.players[newFinishedIdx];
+      if (finishedPlayer) {
+        io.to(room.id).emit('chatMessage', {
+          playerId: finishedPlayer.id,
+          sender: '系统',
+          message: `${finishedPlayer.name}跑了`,
+          isEmoji: false,
+          timestamp: Date.now()
+        });
+
+        if (finishedPlayer.mvpSound) {
+          emitMvp(room, { sound: finishedPlayer.mvpSound, name: finishedPlayer.name, durationMs: 10000 });
+        }
+      }
+    }
     
     io.to(room.id).emit('gameState', publicizeGameState(nextState));
     // IMPORTANT: Also emit private state so trusteeship player sees hand update
@@ -574,7 +595,7 @@ function executeBotTurn(room: Room) {
     // Check game over
     if (nextState.finishedOrder.length >= nextState.playerCount) {
        // Calculate Scores (Bot Logic Duplication - Refactor ideally, but for now copy logic)
-       const baseScore = 1000;
+      const baseScore = 1;
        const multiplier = nextState.multiplier;
        const totalStake = baseScore * multiplier;
        const finished = nextState.finishedOrder;
@@ -606,7 +627,16 @@ function executeBotTurn(room: Room) {
            finishedOrder: nextState.finishedOrder,
            revolution: nextState.revolution
        };
-       io.to(room.id).emit('gameOver', { finishedOrder: nextState.finishedOrder, scores: room.players.map(p => ({ id: p.id, score: p.score })), multiplier });
+       io.to(room.id).emit('gameOver', {
+         finishedOrder: nextState.finishedOrder,
+         scores: room.players.map(p => ({ id: p.id, score: p.score })),
+         deltas: room.players.map(p => ({
+           id: p.id,
+           delta: p.score - (room.roundStartScores?.[p.id] ?? p.score)
+         })),
+         multiplier
+       });
+       room.roundStartScores = undefined;
        
        // MVP Check
        const winnerIdx = nextState.finishedOrder[0];
@@ -830,7 +860,7 @@ io.on('connection', (socket: Socket) => {
         id: socket.id,
         name,
         ready: false,
-        score: 10000,
+        score: 5_000_000,
         mvpSound: undefined,
         connected: true,
         lastSeen: now,
@@ -911,6 +941,8 @@ io.on('connection', (socket: Socket) => {
     }
     
     try {
+      // Snapshot scores for round delta calculation
+      r.roundStartScores = Object.fromEntries(r.players.map(p => [p.id, p.score]));
       const state = initGame({ 
         playerCount: r.players.length,
         lastRoundResult: r.lastRoundResult
@@ -1142,10 +1174,21 @@ io.on('connection', (socket: Socket) => {
       // Check if someone just finished
       if (nextState.finishedOrder.length > prevFinishedCount) {
           const newFinishedIdx = nextState.finishedOrder[prevFinishedCount];
-            const finishedPlayer = r.players[newFinishedIdx];
-            if (finishedPlayer && finishedPlayer.mvpSound) {
-              emitMvp(r, { sound: finishedPlayer.mvpSound, name: finishedPlayer.name, durationMs: 10000 });
-            }
+          const finishedPlayer = r.players[newFinishedIdx];
+
+          if (finishedPlayer) {
+            io.to(upperRoom).emit('chatMessage', {
+              playerId: finishedPlayer.id,
+              sender: '系统',
+              message: `${finishedPlayer.name}跑了`,
+              isEmoji: false,
+              timestamp: Date.now()
+            });
+          }
+
+          if (finishedPlayer && finishedPlayer.mvpSound) {
+            emitMvp(r, { sound: finishedPlayer.mvpSound, name: finishedPlayer.name, durationMs: 10000 });
+          }
       }
       
       emitRoomState(r);
@@ -1156,7 +1199,7 @@ io.on('connection', (socket: Socket) => {
          if (r.turnTimer) clearTimeout(r.turnTimer);
          
          // Calculate Scores
-         const baseScore = 100;
+         const baseScore = 1;
          const multiplier = nextState.multiplier;
          const totalStake = baseScore * multiplier;
          const finished = nextState.finishedOrder;
@@ -1194,8 +1237,14 @@ io.on('connection', (socket: Socket) => {
          io.to(upperRoom).emit('gameOver', { 
              finishedOrder: nextState.finishedOrder,
              scores: r.players.map(p => ({ id: p.id, score: p.score })),
+             deltas: r.players.map(p => ({
+               id: p.id,
+               delta: p.score - (r.roundStartScores?.[p.id] ?? p.score)
+             })),
              multiplier: multiplier
          });
+
+         r.roundStartScores = undefined;
          
          emitRoomState(r);
       } else {
@@ -1247,7 +1296,7 @@ io.on('connection', (socket: Socket) => {
         if (nextState.finishedOrder.length >= nextState.playerCount) {
              if (r.turnTimer) clearTimeout(r.turnTimer);
              
-             const baseScore = 1000;
+             const baseScore = 1;
              const multiplier = nextState.multiplier;
              const totalStake = baseScore * multiplier;
              const finished = nextState.finishedOrder;
