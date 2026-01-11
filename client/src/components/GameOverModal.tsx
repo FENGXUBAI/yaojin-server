@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Player } from '@/types'
 import { useEffect } from 'react'
 import { bgmPlayer } from '@/services/bgm'
+import { formatCoins } from '@/utils/formatCoins'
 
 interface GameOverModalProps {
   results: {
@@ -64,7 +65,7 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
                     </span>
                   </div>
                   <div className="font-mono text-yellow-400">
-                    💰 {score}
+                    💰 {formatCoins(score)}
                   </div>
                 </div>
               )
@@ -85,7 +86,7 @@ export default function GameOverModal({ results, players, myId, onClose }: GameO
                         </span>
                       </div>
                       <div className="font-mono text-yellow-400">
-                        💰 {score}
+                        💰 {formatCoins(score)}
                       </div>
                     </div>
                 )

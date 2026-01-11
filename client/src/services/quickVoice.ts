@@ -10,6 +10,10 @@ export const QUICK_VOICES: Array<{ label: string; file: string }> = [
   { label: '得得得得得得得得得得得得', file: '得得得得得得得得得得得得.mp3' },
   { label: '快点啊，都的我花都谢了', file: '快点啊，都的我花都谢了.mp3' },
   { label: '玩游戏一定要笑', file: '玩游戏一定要笑.mp3' },
+  { label: 'Man', file: 'Man.mp3' },
+  { label: 'What can I say', file: 'What can I say.mp3' },
+  { label: '曼巴out', file: '曼巴out.mp3' },
+  { label: '我要验牌', file: '我要验牌.mp3' },
 ]
 
 const BASE = `${import.meta.env.BASE_URL}assets/sounds/quickchat`.replace(/\/+/g, '/')

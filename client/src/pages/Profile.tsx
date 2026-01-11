@@ -1,4 +1,5 @@
 import { useUserStore } from '@/store/userStore'
+import { formatCoins } from '@/utils/formatCoins'
 import { useNavigate } from 'react-router-dom'
 
 export default function Profile() {
@@ -36,7 +37,7 @@ export default function Profile() {
           <div>
             <label className="text-sm text-slate-400">金币</label>
             <div className="text-lg font-bold text-yellow-400 mt-1">
-              {user.coins.toLocaleString()}
+              {formatCoins(user.coins)}
             </div>
           </div>
         </div>

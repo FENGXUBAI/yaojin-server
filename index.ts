@@ -66,7 +66,7 @@ app.post('/api/auth/guest', (req, res) => {
       id: userId,
       nickname: finalNickname,
       avatarUrl: '',
-      coins: 50000,
+      coins: 500000,
       level: 1
     };
     
@@ -105,7 +105,7 @@ app.post('/api/auth/wechat', (req, res) => {
         id: userId,
         nickname: nickname || `微信用户${Math.floor(Math.random() * 1000)}`,
         avatarUrl: avatarUrl || '',
-        coins: 50000,
+        coins: 500000,
         level: 1
       };
       users.set(userId, user);
@@ -788,7 +788,7 @@ io.on('connection', (socket: Socket) => {
         id: socket.id,
         name,
         ready: false,
-        score: 10000,
+        score: 500000,
         mvpSound: undefined,
         connected: true,
         lastSeen: now,

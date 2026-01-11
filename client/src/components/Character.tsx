@@ -6,11 +6,11 @@ interface CharacterProps {
   name: string
   isMe: boolean
   isTurn: boolean
-  cardCount: number
+  cardCount?: number
   onClick?: (e: MouseEvent<HTMLDivElement>) => void
 }
 
-export default function Character({ name, isMe, isTurn, cardCount, onClick }: CharacterProps) {
+export default function Character({ name, isMe, isTurn, onClick }: CharacterProps) {
   // Generate pseudo-random avatar features based on name
   const nameSum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   const hairColor = ['#1a1a1a', '#5d4037', '#e6c200', '#d84315', '#607d8b'][nameSum % 5]
@@ -67,13 +67,6 @@ export default function Character({ name, isMe, isTurn, cardCount, onClick }: Ch
           <div className="absolute -inset-1 rounded-full border-2 border-yellow-400 animate-ping opacity-75" />
         )}
 
-        {/* Hand Cards Visual */}
-        {cardCount > 0 && (
-          <div className="absolute -right-2 top-0 bg-slate-800 text-white text-xs font-bold px-2 py-0.5 rounded-full border border-white/30 shadow-sm z-10 flex items-center gap-1">
-             <div className="w-2 h-3 bg-white rounded-[1px] transform rotate-12" />
-             {cardCount}
-          </div>
-        )}
       </motion.div>
 
       {/* Name Tag */}

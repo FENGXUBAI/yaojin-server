@@ -13,11 +13,12 @@ import InteractionLayer, { InteractionEvent } from '@/components/InteractionLaye
 import QuickChat from '@/components/QuickChat'
 import BGMController from '@/components/BGMController'
 import { Bot, Clock, X } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Coins from '@/components/Coins'
 import { ITEMS } from '@/components/InteractionLayer'
 import { isQuickVoiceLabel, playQuickVoiceByLabel } from '@/services/quickVoice'
 import { playSpecialSfx } from '@/services/sfx'
+import { formatCoins } from '@/utils/formatCoins'
 
 function CountdownTimer({ durationMs, startTime }: { durationMs: number, startTime: number }) {
   const [timeLeft, setTimeLeft] = useState(0)
@@ -65,10 +66,13 @@ export default function Room() {
   const [interactionMenuTarget, setInteractionMenuTarget] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{x: number, y: number} | null>(null)
   const [isX10, setIsX10] = useState(false)
+  const [showRevolution, setShowRevolution] = useState(false)
   const pendingHintKeyRef = useRef<string | null>(null)
   
   // Refs for positioning
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  const isPlaying = !!room && room.status === 'playing' && !!gameState
 
   useEffect(() => {
     const onGameOver = (data: any) => {
@@ -76,6 +80,17 @@ export default function Room() {
     }
 
     const onInteraction = (data: { senderId: string, targetId: string, type: string }) => {
+      try {
+        const sfxByType: Record<string, Parameters<typeof playSpecialSfx>[0]> = {
+          flower: 'flower',
+          bomb: 'special_bomb',
+          brick: 'special_bomb',
+          kiss: 'star',
+          beer: 'coins',
+        }
+        playSpecialSfx(sfxByType[data.type] || 'select')
+      } catch {}
+
       const senderEl = playerRefs.current[data.senderId]
       const targetEl = playerRefs.current[data.targetId]
       
@@ -167,6 +182,20 @@ export default function Room() {
       gameSocket.off('hints', onHints)
     }
   }, [room])
+
+  // 革命全屏提示：每局开始时如果本局有革命，展示一次
+  useEffect(() => {
+    if (!gameState?.gameId) return
+    if (!isPlaying) return
+
+    if (gameState.revolution) {
+      setShowRevolution(true)
+      const t = setTimeout(() => setShowRevolution(false), 2200)
+      return () => clearTimeout(t)
+    }
+
+    setShowRevolution(false)
+  }, [gameState?.gameId, isPlaying, gameState?.revolution])
 
   const sendInteraction = (type: string) => {
     if (interactionMenuTarget && room) {
@@ -284,7 +313,6 @@ export default function Room() {
   }
 
   const isOwner = room.ownerId === gameSocket.id
-  const isPlaying = room.status === 'playing' && gameState
   const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
 
@@ -343,6 +371,7 @@ export default function Room() {
   // Check trusteeship status of current player
   const myPlayer = myIndex !== -1 ? room.players[myIndex] : null
   const isTrusteeship = !!myPlayer?.isTrusteeship
+  const myCoins = myPlayer?.score ?? 0
 
   const toggleTrusteeship = () => {
     setTrusteeship(!isTrusteeship)
@@ -478,7 +507,7 @@ export default function Room() {
             />
 
             <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              <Coins size={14} /> <span>{topPlayer.player.score}</span>
+              <Coins size={14} /> <span>{formatCoins(topPlayer.player.score)}</span>
             </div>
             
             {topPlayer.player.isTrusteeship && (
@@ -513,7 +542,7 @@ export default function Room() {
             />
 
             <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              <Coins size={14} /> <span>{leftPlayer.player.score}</span>
+              <Coins size={14} /> <span>{formatCoins(leftPlayer.player.score)}</span>
             </div>
 
             {leftPlayer.player.isTrusteeship && (
@@ -548,7 +577,7 @@ export default function Room() {
             />
 
             <div className="flex items-center gap-1 text-xs text-yellow-400 mt-1 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
-              <Coins size={14} /> <span>{rightPlayer.player.score}</span>
+              <Coins size={14} /> <span>{formatCoins(rightPlayer.player.score)}</span>
             </div>
 
             {rightPlayer.player.isTrusteeship && (
@@ -570,12 +599,16 @@ export default function Room() {
             className="absolute bottom-4 left-4 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto flex flex-col items-center gap-2"
           >
              <Character 
-               name="我"
+               name={myPlayer?.name || user?.nickname || '我'}
                isMe={true}
                isTurn={!!isMyTurn}
                cardCount={0} 
                onClick={(e) => gameSocket.id && handleCharacterClick(gameSocket.id, e)}
              />
+
+             <div className="flex items-center gap-1 text-xs text-yellow-400 font-bold bg-black/40 px-3 py-0.5 rounded-full backdrop-blur-sm border border-yellow-500/30">
+               <Coins size={14} /> <span>{formatCoins(myCoins)}</span>
+             </div>
 
              {/* My Chat Bubble */}
              {gameSocket.id && chatBubbles.filter(b => b.playerId === gameSocket.id).slice(-1).map(b => (
@@ -723,6 +756,29 @@ export default function Room() {
         events={interactions} 
         onComplete={(id) => setInteractions(prev => prev.filter(i => i.id !== id))} 
       />
+
+      {/* Revolution Overlay */}
+      <AnimatePresence>
+        {showRevolution && (
+          <motion.div
+            key={gameState?.gameId || 'revolution'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 10 }}
+              className="px-10 py-6 rounded-2xl bg-red-600/90 border-4 border-yellow-300 text-white font-black text-5xl drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
+              style={{ textShadow: '0 0 18px rgba(255, 220, 120, 0.9)' }}
+            >
+              革命成功！
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Game Over Modal */}
       {gameOverData && room && gameSocket.id && (

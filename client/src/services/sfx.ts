@@ -72,11 +72,10 @@ function pickVoiceFile(evt: any): string | null {
 
   // Bomb/Hong (炸弹/轰)
   if (patternType === 'FOUR' || patternType === 'TRIPLE') {
-    const idx = cardRank ? RANK_TO_INDEX[cardRank] : null
-    if (patternType === 'FOUR' && idx && idx <= 13) {
-      // 轰 uses tuple voice (same as triple in DouDZ)
-      return `voice/tuple${idx}.ogg`
+    if (patternType === 'FOUR') {
+      return 'voice/special_bomb.ogg'
     }
+    const idx = cardRank ? RANK_TO_INDEX[cardRank] : null
     if (patternType === 'TRIPLE' && idx && idx <= 13) {
       return `voice/tuple${idx}.ogg`
     }
@@ -125,7 +124,7 @@ function pickSimpleSfx(evt: any): string | null {
   const patternType: string | undefined = evt?.patternType ?? evt?.pattern?.type
   const isKingBomb = !!(evt?.isKingBomb ?? evt?.pattern?.extra?.isKingBomb)
 
-  if (patternType === 'FOUR') return MAP.bomb
+  if (patternType === 'FOUR') return 'voice/special_bomb.ogg'
   if (patternType === 'PAIR' && isKingBomb) return MAP.king_bomb
   if (patternType === 'SINGLE') return MAP.play_single
   if (patternType === 'PAIR') return MAP.play_pair

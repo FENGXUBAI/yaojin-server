@@ -75,21 +75,20 @@ export function initGame(opts: { playerCount: number; deck?: Card[]; lastRoundRe
   } else {
     // 后续局
     const { finishedOrder } = opts.lastRoundResult;
-    
-    // Check Revolution
-    revolution = checkRevolution(hands, finishedOrder);
-    
-    // Compute Tribute
-    const plan = computeTributePlan(opts.playerCount, finishedOrder, revolution);
+
+    const rev = computeRevolutionOutcome(hands, finishedOrder);
+    revolution = rev.revolution;
+
+    // Compute Tribute (may be partially exempted by revolution)
+    const plan = computeTributePlan(opts.playerCount, finishedOrder, revolution, rev.exemptDonors);
 
     // 手动进贡：等待 donor 点击确认把“最大牌”交给 receiver
     for (const { donor, receiver, count } of plan.donorToReceiver) {
       pendingTributes.push({ actionBy: donor, giveTo: receiver, count });
     }
 
-    if (revolution) {
-      // 革命：第一个跑了的人先出 (Winner)
-      firstPlayer = finishedOrder[0];
+    if (revolution && rev.firstPlayer !== null) {
+      firstPlayer = rev.firstPlayer;
     } else {
       // 无革命：最后一个跑了的人先出 (Loser)
       firstPlayer = finishedOrder[finishedOrder.length - 1];
@@ -579,53 +578,83 @@ export interface TributePlan {
   revolution: boolean;
 }
 
-export function checkRevolution(hands: Card[][], finishedOrder: number[]): boolean {
-  // 革命逻辑：当需要进贡的一个人手里有了王轰，则这进贡的所有人都不需要进贡了
-  // 需要进贡的人：
-  // 4人局：第3名（给第2名），第4名（给第1名）。
-  // 3人局：第3名（给第2名，第1名不需要进贡？规则只说了第3给第2，第4给第1。3人局通常是第3给第1？用户规则：“第三个跑了的人要把牌中最大的一张给第二个跑了的人...第四个跑了的人要把牌中最大的两张张给第一个跑了的人”）
-  // 用户规则描述有点混淆，通常3人局是末游给上游。
-  // 按照用户文字：“第三个跑了的人...给第二个...第四个...给第一个”。
-  // 假设3人局只有前半句：第3给第2？这有点奇怪，通常是给第1。
-  // 但严格按用户文字：
-  // 3人局：finishedOrder[2] 是第三个跑了的人。他需要进贡。
-  // 4人局：finishedOrder[2] 和 finishedOrder[3] 是需要进贡的人。
-  
-  // 检查这些“需要进贡的人”手里是否有王轰。
-  // 注意：此时是“下一局开始随机分完牌的时候”。所以我们要检查的是新发的手牌。
-  
-  const playerCount = hands.length;
-  const potentialDonors: number[] = [];
-  if (playerCount >= 3) potentialDonors.push(finishedOrder[2]);
-  if (playerCount >= 4) potentialDonors.push(finishedOrder[3]);
-
-  for (const pIdx of potentialDonors) {
-    // 检查 hands[pIdx] 是否有王轰 (大王 + 小王)
-    const hasBig = hands[pIdx].some(c => c.rank === 'JOKER_BIG');
-    const hasSmall = hands[pIdx].some(c => c.rank === 'JOKER_SMALL');
-    if (hasBig && hasSmall) return true;
-  }
-  return false;
+function hasKingBomb(hand: Card[]): boolean {
+  const hasBig = hand.some(c => c.rank === 'JOKER_BIG')
+  const hasSmall = hand.some(c => c.rank === 'JOKER_SMALL')
+  return hasBig && hasSmall
 }
 
-export function computeTributePlan(playerCount: number, finishedOrder: number[], isRevolution: boolean): TributePlan {
-  if (isRevolution) {
-    return { donorToReceiver: [], revolution: true };
-  }
-  
-  const donors: { donor: number; receiver: number; count: number }[] = [];
-  // 进贡规则（用户确认版）：
-  // 3人：最后一名 -> 第一名（最大1张）；第二名不吃贡也不回贡。
-  // 4人：最后一名 -> 第一名（最大2张）；第三名 -> 第二名（最大1张）。
+function computeRevolutionOutcome(
+  hands: Card[][],
+  finishedOrder: number[]
+): { revolution: boolean; exemptDonors: number[]; firstPlayer: number | null } {
+  const playerCount = hands.length
+  const exempt = new Set<number>()
+
   if (playerCount === 3 && finishedOrder.length >= 3) {
-    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[0], count: 1 });
+    const donor = finishedOrder[2]
+    if (hasKingBomb(hands[donor] ?? [])) exempt.add(donor)
+  }
+
+  if (playerCount === 4 && finishedOrder.length >= 4) {
+    const donor4 = finishedOrder[3]
+    const donor3 = finishedOrder[2]
+    if (hasKingBomb(hands[donor4] ?? [])) exempt.add(donor4)
+    if (hasKingBomb(hands[donor3] ?? [])) exempt.add(donor3)
+  }
+
+  const revolution = exempt.size > 0
+  let firstPlayer: number | null = null
+
+  if (revolution) {
+    if (playerCount === 3) {
+      firstPlayer = finishedOrder[0] ?? null
+    } else if (playerCount === 4) {
+      const donor4 = finishedOrder[3]
+      const donor3 = finishedOrder[2]
+
+      // 4人局规则：
+      // - 第4名革命：免第4->第1进贡；第3仍进贡；第1先出
+      // - 第3名革命：免第3->第2进贡；第4仍进贡；第4先出
+      if (donor4 != null && exempt.has(donor4)) {
+        firstPlayer = finishedOrder[0] ?? null
+      } else if (donor3 != null && exempt.has(donor3)) {
+        firstPlayer = donor4 ?? null
+      } else {
+        firstPlayer = finishedOrder[0] ?? null
+      }
+    }
+  }
+
+  return { revolution, exemptDonors: [...exempt], firstPlayer }
+}
+
+export function checkRevolution(hands: Card[][], finishedOrder: number[]): boolean {
+  return computeRevolutionOutcome(hands, finishedOrder).revolution
+}
+
+export function computeTributePlan(
+  playerCount: number,
+  finishedOrder: number[],
+  isRevolution: boolean,
+  exemptDonors: number[] = []
+): TributePlan {
+  const donors: { donor: number; receiver: number; count: number }[] = []
+
+  // 基础进贡规则：
+  // 3人：末名 -> 首名（最大1张）
+  // 4人：末名 -> 首名（最大2张）；第三 -> 第二（最大1张）
+  if (playerCount === 3 && finishedOrder.length >= 3) {
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[0], count: 1 })
   }
   if (playerCount === 4 && finishedOrder.length >= 4) {
-    donors.push({ donor: finishedOrder[3], receiver: finishedOrder[0], count: 2 });
-    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 });
+    donors.push({ donor: finishedOrder[3], receiver: finishedOrder[0], count: 2 })
+    donors.push({ donor: finishedOrder[2], receiver: finishedOrder[1], count: 1 })
   }
-  
-  return { donorToReceiver: donors, revolution: false };
+
+  const exempt = new Set(exemptDonors)
+  const filtered = donors.filter(d => !exempt.has(d.donor))
+  return { donorToReceiver: filtered, revolution: isRevolution }
 }
 
 // 执行进贡（自动）：把 donor 最大的牌给 receiver

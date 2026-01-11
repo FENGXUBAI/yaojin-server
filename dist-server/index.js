@@ -57,7 +57,7 @@ app.post('/api/auth/guest', (req, res) => {
             id: userId,
             nickname: finalNickname,
             avatarUrl: '',
-            coins: 50000,
+            coins: 500000,
             level: 1
         };
         users.set(userId, user);
@@ -91,7 +91,7 @@ app.post('/api/auth/wechat', (req, res) => {
                 id: userId,
                 nickname: nickname || `微信用户${Math.floor(Math.random() * 1000)}`,
                 avatarUrl: avatarUrl || '',
-                coins: 50000,
+                coins: 500000,
                 level: 1
             };
             users.set(userId, user);
@@ -339,6 +339,7 @@ const rooms = new Map();
 const socketRoom = new Map();
 const socketClientKey = new Map();
 const lastEventAt = new Map();
+const lastEventAtKeyed = new Map();
 function newClientKey() {
     return crypto_1.default.randomBytes(16).toString('hex');
 }
@@ -355,6 +356,15 @@ function isRateLimited(socketId, minIntervalMs) {
     if (now - prev < minIntervalMs)
         return true;
     lastEventAt.set(socketId, now);
+    return false;
+}
+function isRateLimitedKeyed(socketId, key, minIntervalMs) {
+    const now = Date.now();
+    const k = `${socketId}:${key}`;
+    const prev = lastEventAtKeyed.get(k) ?? 0;
+    if (now - prev < minIntervalMs)
+        return true;
+    lastEventAtKeyed.set(k, now);
     return false;
 }
 function emitSfx(r, evt) {
@@ -438,7 +448,7 @@ function executeBotTurn(room) {
         // Check game over
         if (nextState.finishedOrder.length >= nextState.playerCount) {
             // Calculate Scores (Bot Logic Duplication - Refactor ideally, but for now copy logic)
-            const baseScore = 1000;
+            const baseScore = 1;
             const multiplier = nextState.multiplier;
             const totalStake = baseScore * multiplier;
             const finished = nextState.finishedOrder;
@@ -672,7 +682,7 @@ io.on('connection', (socket) => {
                 id: socket.id,
                 name,
                 ready: false,
-                score: 10000,
+                score: 500000,
                 mvpSound: undefined,
                 connected: true,
                 lastSeen: now,
@@ -911,7 +921,7 @@ io.on('connection', (socket) => {
                 if (r.turnTimer)
                     clearTimeout(r.turnTimer);
                 // Calculate Scores
-                const baseScore = 1000;
+                const baseScore = 1;
                 const multiplier = nextState.multiplier;
                 const totalStake = baseScore * multiplier;
                 const finished = nextState.finishedOrder;
@@ -999,7 +1009,7 @@ io.on('connection', (socket) => {
             if (nextState.finishedOrder.length >= nextState.playerCount) {
                 if (r.turnTimer)
                     clearTimeout(r.turnTimer);
-                const baseScore = 1000;
+                const baseScore = 1;
                 const multiplier = nextState.multiplier;
                 const totalStake = baseScore * multiplier;
                 const finished = nextState.finishedOrder;
@@ -1078,6 +1088,9 @@ io.on('connection', (socket) => {
             return;
         // 广播聊天消息给房间内所有玩家
         io.to(room).emit('chatMessage', {
+            // Backward/forward compatible fields
+            playerId: player.id,
+            player: player.name,
             sender: player.name,
             message: message.substring(0, 100),
             isEmoji: !!isEmoji,
@@ -1086,7 +1099,9 @@ io.on('connection', (socket) => {
     });
     // 互动表情处理
     socket.on('interaction', ({ room, targetId, type }) => {
-        if (isRateLimited(socket.id, 500))
+        // Allow faster interaction bursts from clients (client may send at ~200ms intervals)
+        // Use a slightly smaller limit to tolerate timer jitter.
+        if (isRateLimitedKeyed(socket.id, 'interaction', 150))
             return;
         const r = rooms.get(room);
         if (!r)
