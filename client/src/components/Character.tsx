@@ -25,10 +25,11 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
   const shirtColor = clothTones[nameSum % clothTones.length]
   const accent = isMe ? '#93C5FD' : ['#FDA4AF', '#6EE7B7', '#FDE68A', '#C4B5FD'][nameSum % 4]
 
-  const hairStyle = nameSum % 4 // 0..3
-  const hasGlasses = nameSum % 5 === 0
-  const hasBeard = nameSum % 6 === 0
+  const hairStyle = nameSum % 5 // 0..4
+  const hasGlasses = nameSum % 6 === 0
+  // keep cartoon cute; no beard
   const smileStyle = nameSum % 3 // 0..2
+  const eyeStyle = nameSum % 3 // 0..2
 
   return (
     <div className="relative flex flex-col items-center group cursor-pointer" onClick={onClick}>
@@ -47,7 +48,7 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
           isOut ? 'opacity-60 saturate-0' : 'opacity-100'
         )}
       >
-        {/* Human-like Avatar (soft circle portrait) */}
+        {/* Cartoon Avatar (chibi style) */}
         <div className={clsx(
           'w-full h-full rounded-full overflow-hidden relative',
           'shadow-[0_10px_24px_rgba(0,0,0,0.35)] border border-white/25',
@@ -61,7 +62,7 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
             }}
           />
 
-          {/* Portrait SVG */}
+          {/* Chibi SVG */}
           <svg viewBox="0 0 100 100" className="w-full h-full relative">
             <defs>
               <radialGradient id={`skin-${name}`} cx="45%" cy="35%" r="60%">
@@ -73,8 +74,8 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
                 <stop offset="0%" stopColor={shirtColor} stopOpacity="1" />
                 <stop offset="100%" stopColor={shirtColor} stopOpacity="0.72" />
               </linearGradient>
-              <radialGradient id={`shadow-${name}`} cx="50%" cy="65%" r="55%">
-                <stop offset="0%" stopColor="#000" stopOpacity="0.22" />
+              <radialGradient id={`shadow-${name}`} cx="50%" cy="70%" r="55%">
+                <stop offset="0%" stopColor="#000" stopOpacity="0.18" />
                 <stop offset="100%" stopColor="#000" stopOpacity="0" />
               </radialGradient>
             </defs>
@@ -82,51 +83,64 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
             {/* Soft vignette */}
             <rect x="0" y="0" width="100" height="100" fill="#0f172a" opacity="0.06" />
 
-            {/* Shoulders */}
-            <path d="M10,100 C16,76 32,64 50,64 C68,64 84,76 90,100 Z" fill={`url(#shirt-${name})`} />
-
-            {/* Collar */}
-            <path d="M36,66 Q50,74 64,66" fill="none" stroke="#ffffff" strokeOpacity="0.22" strokeWidth="3" strokeLinecap="round" />
+            {/* Body (tiny) */}
+            <path d="M18,100 C22,78 34,66 50,66 C66,66 78,78 82,100 Z" fill={`url(#shirt-${name})`} />
+            <path d="M30,74 Q50,82 70,74" fill="none" stroke="#fff" strokeOpacity="0.22" strokeWidth="3" strokeLinecap="round" />
 
             {/* Neck + shadow */}
-            <ellipse cx="50" cy="70" rx="18" ry="10" fill={`url(#shadow-${name})`} opacity="0.35" />
-            <rect x="43" y="52" width="14" height="18" rx="7" fill={skinColor} opacity="0.98" />
+            <ellipse cx="50" cy="72" rx="18" ry="9" fill={`url(#shadow-${name})`} opacity="0.35" />
+            <rect x="44" y="56" width="12" height="14" rx="6" fill={skinColor} opacity="0.98" />
 
-            {/* Head */}
-            <path d="M50,14 C33,14 24,27 24,42 C24,58 34,71 50,71 C66,71 76,58 76,42 C76,27 67,14 50,14 Z" fill={`url(#skin-${name})`} />
+            {/* Head (big, round) */}
+            <circle cx="50" cy="42" r="28" fill={`url(#skin-${name})`} />
+            <circle cx="50" cy="42" r="28" fill="none" stroke="#111827" strokeOpacity="0.12" strokeWidth="2" />
 
-            {/* Ears */}
-            <ellipse cx="23" cy="44" rx="4" ry="7" fill={skinColor} opacity="0.9" />
-            <ellipse cx="77" cy="44" rx="4" ry="7" fill={skinColor} opacity="0.9" />
-
-            {/* Hair styles */}
+            {/* Hair styles (cartoon bangs) */}
             {hairStyle === 0 && (
-              <path d="M22,42 C22,22 35,10 50,10 C65,10 78,22 78,42 C75,26 66,20 50,18 C34,20 25,26 22,42 Z" fill={hairColor} />
+              <path d="M22,40 Q26,18 50,16 Q74,18 78,40 Q70,30 62,30 Q50,28 38,30 Q30,30 22,40 Z" fill={hairColor} />
             )}
             {hairStyle === 1 && (
-              <path d="M22,44 C22,20 38,8 52,10 C66,12 78,26 76,44 C72,26 62,18 50,18 C36,18 27,26 22,44 Z" fill={hairColor} />
+              <path d="M22,42 Q24,18 50,14 Q76,18 78,42 Q72,32 60,30 Q50,28 40,30 Q28,32 22,42 Z" fill={hairColor} />
             )}
             {hairStyle === 2 && (
-              <path d="M20,44 C20,20 36,8 50,8 C64,8 80,20 80,44 C76,30 66,22 50,22 C34,22 24,30 20,44 Z" fill={hairColor} />
+              <path d="M20,44 Q22,18 50,14 Q78,18 80,44 Q72,28 62,28 Q50,28 38,28 Q28,28 20,44 Z" fill={hairColor} />
             )}
             {hairStyle === 3 && (
-              <path d="M22,44 C22,18 40,8 54,10 C68,12 78,26 76,44 C70,28 62,24 50,24 C38,24 28,28 22,44 Z" fill={hairColor} />
+              <path d="M22,38 Q30,16 50,16 Q70,16 78,38 Q70,26 62,28 Q50,30 38,28 Q30,26 22,38 Z" fill={hairColor} />
+            )}
+            {hairStyle === 4 && (
+              <path d="M22,40 Q30,14 50,14 Q70,14 78,40 Q74,28 66,26 Q50,22 34,26 Q26,28 22,40 Z" fill={hairColor} />
             )}
 
-            {/* Brows */}
-            <path d="M33,41 Q40,36 47,41" fill="none" stroke="#111827" strokeOpacity="0.45" strokeWidth="2.4" strokeLinecap="round" />
-            <path d="M53,41 Q60,36 67,41" fill="none" stroke="#111827" strokeOpacity="0.45" strokeWidth="2.4" strokeLinecap="round" />
+            {/* Hair outline */}
+            <path d="M22,42 Q26,18 50,14 Q74,18 78,42" fill="none" stroke="#111827" strokeOpacity="0.12" strokeWidth="2" strokeLinecap="round" />
 
-            {/* Eyes */}
-            <ellipse cx="40" cy="45" rx="6" ry="4" fill="#fff" opacity="0.95" />
-            <ellipse cx="60" cy="45" rx="6" ry="4" fill="#fff" opacity="0.95" />
-            <circle cx="40" cy="46" r="2.5" fill={eyeColor} />
-            <circle cx="60" cy="46" r="2.5" fill={eyeColor} />
-            <circle cx="39" cy="45" r="0.9" fill="#fff" />
-            <circle cx="59" cy="45" r="0.9" fill="#fff" />
+            {/* Brows (thicker, cute) */}
+            <path d="M32,38 Q40,34 48,38" fill="none" stroke="#111827" strokeOpacity="0.35" strokeWidth="3" strokeLinecap="round" />
+            <path d="M52,38 Q60,34 68,38" fill="none" stroke="#111827" strokeOpacity="0.35" strokeWidth="3" strokeLinecap="round" />
 
-            {/* Nose */}
-            <path d="M50,47 Q48,54 50,56" fill="none" stroke="#111827" strokeOpacity="0.22" strokeWidth="2" strokeLinecap="round" />
+            {/* Eyes (big & cute) */}
+            {eyeStyle !== 2 && (
+              <>
+                <ellipse cx="40" cy="46" rx="8" ry="9" fill="#111827" opacity="0.92" />
+                <ellipse cx="60" cy="46" rx="8" ry="9" fill="#111827" opacity="0.92" />
+                <circle cx="38" cy="43" r="2.4" fill="#fff" opacity="0.95" />
+                <circle cx="58" cy="43" r="2.4" fill="#fff" opacity="0.95" />
+                <circle cx="41" cy="48" r="1.6" fill="#fff" opacity="0.65" />
+                <circle cx="61" cy="48" r="1.6" fill="#fff" opacity="0.65" />
+                <circle cx="40" cy="47" r="3" fill={eyeColor} opacity="0.25" />
+                <circle cx="60" cy="47" r="3" fill={eyeColor} opacity="0.25" />
+              </>
+            )}
+            {eyeStyle === 2 && (
+              <>
+                <path d="M32,46 Q40,40 48,46" fill="none" stroke="#111827" strokeOpacity="0.7" strokeWidth="3" strokeLinecap="round" />
+                <path d="M52,46 Q60,40 68,46" fill="none" stroke="#111827" strokeOpacity="0.7" strokeWidth="3" strokeLinecap="round" />
+              </>
+            )}
+
+            {/* Nose (tiny) */}
+            <circle cx="50" cy="55" r="1.3" fill="#111827" opacity="0.25" />
 
             {/* Blush */}
             <ellipse cx="32" cy="54" rx="6" ry="3.2" fill="#fb7185" opacity="0.18" />
@@ -135,26 +149,21 @@ export default function Character({ name, isMe, isTurn, isOut, onClick }: Charac
             {/* Glasses */}
             {hasGlasses && (
               <g opacity="0.55">
-                <rect x="30" y="41" width="19" height="12" rx="5" fill="none" stroke="#111827" strokeWidth="2" />
-                <rect x="51" y="41" width="19" height="12" rx="5" fill="none" stroke="#111827" strokeWidth="2" />
+                <rect x="29" y="40" width="20" height="14" rx="6" fill="none" stroke="#111827" strokeWidth="2" />
+                <rect x="51" y="40" width="20" height="14" rx="6" fill="none" stroke="#111827" strokeWidth="2" />
                 <path d="M49,47 L51,47" stroke="#111827" strokeWidth="2" strokeLinecap="round" />
               </g>
             )}
 
             {/* Mouth */}
             {smileStyle === 0 && (
-              <path d="M42,60 Q50,66 58,60" fill="none" stroke="#111827" strokeOpacity="0.65" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M42,62 Q50,70 58,62" fill="none" stroke="#111827" strokeOpacity="0.65" strokeWidth="3" strokeLinecap="round" />
             )}
             {smileStyle === 1 && (
-              <path d="M43,62 Q50,64 57,62" fill="none" stroke="#111827" strokeOpacity="0.60" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M43,64 Q50,66 57,64" fill="none" stroke="#111827" strokeOpacity="0.60" strokeWidth="3" strokeLinecap="round" />
             )}
             {smileStyle === 2 && (
-              <path d="M44,60 Q50,63 56,60" fill="none" stroke="#111827" strokeOpacity="0.60" strokeWidth="2.6" strokeLinecap="round" />
-            )}
-
-            {/* Beard (very subtle) */}
-            {hasBeard && (
-              <path d="M38,62 Q50,72 62,62 Q61,76 50,77 Q39,76 38,62 Z" fill="#111827" opacity="0.10" />
+              <path d="M44,63 Q50,61 56,63" fill="none" stroke="#111827" strokeOpacity="0.60" strokeWidth="3" strokeLinecap="round" />
             )}
 
             {/* Highlight */}
