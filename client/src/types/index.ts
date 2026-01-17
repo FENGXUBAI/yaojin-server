@@ -12,6 +12,8 @@ export interface Card {
   suit: string
   isJoker: boolean
   sortValue: number
+  isTribute?: boolean
+  isReturnTribute?: boolean
 }
 
 export interface Player {

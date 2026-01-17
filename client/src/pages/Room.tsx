@@ -68,6 +68,8 @@ export default function Room() {
   const [isX10, setIsX10] = useState(false)
   const [showRevolution, setShowRevolution] = useState(false)
   const pendingHintKeyRef = useRef<string | null>(null)
+  const flashTimersRef = useRef<Record<string, number>>({})
+  const [flashCardKeys, setFlashCardKeys] = useState<Set<string>>(new Set())
   
   // Refs for positioning
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -316,6 +318,39 @@ export default function Room() {
   const myHand = isPlaying && myIndex !== -1 ? (gameState.hands?.[myIndex] ?? []) : []
   const isMyTurn = isPlaying && gameState.currentPlayer === myIndex
   const finishedSet = useMemo(() => new Set<number>(isPlaying ? (gameState.finishedOrder ?? []) : []), [isPlaying, gameState?.finishedOrder])
+
+  const cardKey = (c: any) => `${c?.rank ?? ''}|${c?.suit ?? ''}|${c?.isJoker ? 1 : 0}`
+
+  // 进贡/回贡牌高亮 5 秒：只要牌进入我的手牌且带标记，就触发一次闪光
+  useEffect(() => {
+    if (!isPlaying || myIndex === -1) return
+
+    const toAdd: string[] = []
+    for (const c of myHand as any[]) {
+      if (!c) continue
+      if (!(c.isTribute || c.isReturnTribute)) continue
+      const key = cardKey(c)
+      if (flashTimersRef.current[key]) continue
+      toAdd.push(key)
+      const t = window.setTimeout(() => {
+        setFlashCardKeys(prev => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+        delete flashTimersRef.current[key]
+      }, 5000)
+      flashTimersRef.current[key] = t
+    }
+
+    if (toAdd.length) {
+      setFlashCardKeys(prev => {
+        const next = new Set(prev)
+        for (const k of toAdd) next.add(k)
+        return next
+      })
+    }
+  }, [isPlaying, myIndex, myHand])
 
   const bgmScene = useMemo(() => {
     if (gameOverData && room && gameSocket.id) {
@@ -743,6 +778,7 @@ export default function Room() {
                     (isReturnPhase ? selectedReturnCards.includes(idx) : false) ||
                     (!isTributePhase && !isReturnPhase ? selectedCards.includes(idx) : false)
                   }
+                  highlighted={flashCardKeys.has(cardKey(card))}
                   onClick={() => {
                     if (isTributePhase) return toggleTributeCard(idx)
                     if (isReturnPhase) return toggleReturnCard(idx)

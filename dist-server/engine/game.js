@@ -204,31 +204,29 @@ function playTurn(state, action) {
         // 接风逻辑处理
         if (state.jiefengState) {
             const jf = state.jiefengState;
-            // 当前检查的玩家选择不压牌
-            const newSkipped = [...jf.skippedPlayers, state.currentPlayer];
-            // 找下一个要检查的玩家（跳过已经pass的、跑了的、以及下家）
-            let nextChecker = nextActivePlayer(state, state.currentPlayer);
-            // 如果转了一圈回到下家，或者只剩下家了，则下家接风
-            if (nextChecker === jf.nextPlayer || nextChecker === -1) {
-                // 接风成功：下家可以自由出牌
+            const next = nextActivePlayer(state, state.currentPlayer);
+            const passesInRow = state.passesInRow + 1;
+            // 新规则：跑了后不跳过下家，正常轮转一圈。
+            // 若一圈都没人出（= 所有未跑玩家都 pass），则由跑了者下家接风自由出牌。
+            if (passesInRow >= activePlayersCount(state)) {
                 return {
                     ...state,
                     currentPlayer: jf.nextPlayer,
-                    lastPlay: null, // 自由出牌
+                    lastPlay: null,
                     lastPlayOwner: null,
                     passesInRow: 0,
                     jiefengState: null,
                     currentTrickPlays: [],
                 };
             }
-            // 还有其他玩家需要检查
             return {
                 ...state,
-                currentPlayer: nextChecker,
+                currentPlayer: next,
+                passesInRow,
                 jiefengState: {
                     ...jf,
-                    checkingPlayer: nextChecker,
-                    skippedPlayers: newSkipped,
+                    checkingPlayer: next,
+                    skippedPlayers: [...jf.skippedPlayers, state.currentPlayer],
                 },
             };
         }
@@ -353,7 +351,8 @@ function playTurn(state, action) {
     if (compareAgainst) {
         const isOwner = compareAgainst.by === state.currentPlayer;
         const ownerFinished = state.finishedOrder.includes(compareAgainst.by);
-        const everyonePassed = state.passesInRow >= activePlayersCount(state) - 1;
+        const requiredPasses = ownerFinished ? activePlayersCount(state) : (activePlayersCount(state) - 1);
+        const everyonePassed = state.passesInRow >= requiredPasses;
         if (isOwner || (ownerFinished && everyonePassed)) {
             compareAgainst = null;
             isNewTrick = true;
@@ -424,24 +423,15 @@ function playTurn(state, action) {
         // 找到下家（跑了的人的下一个未完成的玩家）
         const nextAfterFinished = nextActivePlayer({ ...state, finishedOrder }, finishedPlayer);
         if (nextAfterFinished !== -1) {
-            // 找到下家之后的下一个人来检查是否能压牌
-            const checkingPlayer = nextActivePlayer({ ...state, finishedOrder }, nextAfterFinished);
-            if (checkingPlayer !== -1 && checkingPlayer !== nextAfterFinished) {
-                // 有其他玩家需要检查，进入接风流程
-                jiefengState = {
-                    finishedPlayer,
-                    lastPlayCards: lastPlayPattern,
-                    nextPlayer: nextAfterFinished,
-                    checkingPlayer,
-                    skippedPlayers: [],
-                };
-                nextPlayer = checkingPlayer; // 先让检查的玩家决定是否要压
-            }
-            else {
-                // 只剩一个活跃玩家，直接接风
-                nextPlayer = nextAfterFinished;
-                // 不设置接风状态，因为这个玩家可以自由出牌（lastPlay会被清空）
-            }
+            // 新规则：不跳过下家，直接从下家开始正常轮转。
+            jiefengState = {
+                finishedPlayer,
+                lastPlayCards: lastPlayPattern,
+                nextPlayer: nextAfterFinished,
+                checkingPlayer: nextAfterFinished,
+                skippedPlayers: [],
+            };
+            nextPlayer = nextAfterFinished;
         }
     }
     const next = {
@@ -599,6 +589,10 @@ function returnTribute(hands, donor, receiver, cards) {
     }
     newHands[receiver] = newRHand;
     // 给 donor
+    for (const c of cards) {
+        delete c.isTribute;
+        c.isReturnTribute = true;
+    }
     newHands[donor].push(...cards);
     // 排序
     newHands[donor].sort((a, b) => b.sortValue - a.sortValue);

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 interface CardProps {
   card: CardType
   selected?: boolean
+  highlighted?: boolean
   onClick?: () => void
   scale?: number
   hidden?: boolean
@@ -18,7 +19,7 @@ const suitColors: Record<string, string> = {
   '♦': 'text-red-600',
 }
 
-export default function Card({ card, selected, onClick, scale = 1, hidden, hideBottomInfo }: CardProps) {
+export default function Card({ card, selected, highlighted, onClick, scale = 1, hidden, hideBottomInfo }: CardProps) {
   if (hidden) {
     return (
       <div 
@@ -45,6 +46,7 @@ export default function Card({ card, selected, onClick, scale = 1, hidden, hideB
       onClick={onClick}
       className={clsx(
         "relative bg-white rounded-lg shadow-md select-none cursor-pointer border border-slate-200 flex flex-col items-center justify-between transition-shadow hover:shadow-lg",
+        highlighted && "ring-4 ring-yellow-300 shadow-[0_0_28px_rgba(234,179,8,0.75)] border-yellow-200",
         colorClass
       )}
       style={{ width: 80 * scale, height: 112 * scale, padding: `${0.25 * scale}rem` }}
